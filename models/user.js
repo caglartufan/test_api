@@ -7,13 +7,18 @@ const userSchema = new mongoose.Schema({
         required: true,
         minlength: 3,
         maxlength: 30,
+        validate: {
+            validator: function(v) {
+                return /^[a-zA-Z0-9]+$/.test(v);
+            },
+            message: 'Kullanıcı adınız sadece harf ve rakamlardan oluşmalıdır'
+        },
         unique: true
     },
     password: {
         type: String,
         required: true,
         minlength: 4,
-        maxlength: 60
     },
     documents: [{
         type: mongoose.SchemaTypes.ObjectId,

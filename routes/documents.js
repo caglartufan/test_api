@@ -2,20 +2,33 @@ const { User } = require('../models/user');
 const { Document } = require('../models/document');
 const mongoose = require('mongoose');
 const multer = require('multer');
+const jsonFileFilter = require('./../helpers/jsonFileFilter');
 const path = require('path');
+const fs = require('fs');
 const express = require('express');
 const router = express.Router();
 
 const storage = multer.diskStorage({
     destination: function(req, file, cb) {
-        cb(null, path.join(process.cwd(), 'uploads'));
+        if(!req.fileUploadFolderName) return cb(new Error('Dokümanın yükleneceği klasör için isim belirtilmemiş.'), null);
+        let uploadDestination = path.join(process.cwd(), 'uploads', req.fileUploadFolderName);
+        fs.access(uploadDestination, (err) => {
+            if(err) {
+                // Directory with username doesn't exist in uploads folder, so create one
+                fs.mkdir(uploadDestination, (err) => {
+                    if(err) throw err;
+                    cb(null, uploadDestination);
+                });
+            }
+            // Directory with username exists
+            cb(null, uploadDestination);
+        });
     },
     filename: function(req, file, cb) {
-        cb(null, file.originalname);
+        cb(null, `${file.originalname.replace('.json', '')}--${Date.now()}.json`);
     }
 });
-const upload = multer({ storage: storage }).single('document');
-
+const upload = multer({ storage: storage, fileFilter: jsonFileFilter }).single('document');
 
 router.get('/', async (req, res, next) => {
     const documents = await Document.find().sort('uploadDate');
@@ -37,22 +50,20 @@ router.post('/:userId', async (req, res, next) => {
     if(!mongoose.Types.ObjectId.isValid(req.params.userId)) return res.status(400).send('Girilen ID değeri uygun değil.');
 
     let user = await User.findById(req.params.userId)
-        .select('documents');
+        .select('documents username');
     if(!user) return res.status(404).send('Verilen ID değerine sahip kullanıcı bulunamadı.');
 
-    return upload(req, res, function(err) {
-        if(req.fileValidationError) return next(req.fileValidationError);
-        else if(!req.file) return res.status(400).send('Herhangi bir doküman seçilmedi.');
-        else if(err instanceof multer.MulterError) return next(err);
-        else if(err) return next(err);
+    req.fileUploadFolderName = user.username;
 
-        console.log(req.file);
+    upload(req, res, function(err) {
+        if(req.fileValidationError) return res.status(400).send(req.fileValidationError.message);
+        else if(!req.file) return res.status(400).send('Herhangi bir doküman seçilmedi.');
+        else if(err instanceof multer.MulterError) return res.status(500).send(err);
+        else if(err) return res.status(500).send(err);
 
         let document = new Document({
             filename: req.file.filename,
-            path: req.file.path,
-            encoding: req.file.encoding,
-            mimetype: req.file.mimetype,
+            path: `/uploads/${req.fileUploadFolderName}/${req.file.filename}`,
             size: req.file.size
         });
 
@@ -65,19 +76,42 @@ router.post('/:userId', async (req, res, next) => {
     });
 });
 
-// Doküman düzenlemeyi ayarla
 router.put('/:documentId', async (req, res, next) => {
     if(!mongoose.Types.ObjectId.isValid(req.params.documentId)) return res.status(400).send('Girilen ID değeri uygun değil');
 
-    const { error } = validate(req.body);
-    if(error) return res.status(400).send(error.details[0].message);
-
-    let document = await Document.findByIdAndUpdate(req.params.documentId, {
-        path: req.file.path
-    }, { new: true });
+    let document = await Document.findById(req.params.documentId);
     if(!document) return res.status(404).send('Verilen ID değerine sahip doküman bulunamadı.');
 
-    res.send(document);
+    let { username } = await User.findOne({ documents: req.params.documentId })
+        .select('username');
+    
+    req.fileUploadFolderName = username;
+
+    upload(req, res, function(err) {
+        if(req.fileValidationError) return res.status(400).send(req.fileValidationError.message);
+        else if(!req.file) return res.status(400).send('Herhangi bir doküman seçilmedi.');
+        else if(err instanceof multer.MulterError) return res.status(500).send(err);
+        else if(err) return res.status(500).send(err);
+
+        let oldFilePathInDiskStorage = path.join(process.cwd(), document.path);
+
+        // Check if the old file exists or not
+        fs.access(oldFilePathInDiskStorage, (err) => {
+            // If the old file exist remove it
+            if(!err) {
+                fs.unlink(oldFilePathInDiskStorage, (err) => {
+                    if(err) res.status(500).send('Düzenlenmek istenen dökümanın eski sürümü silinemedi.');
+                });
+            }
+
+            document.filename = req.file.filename;
+            document.path = `/uploads/${req.fileUploadFolderName}/${req.file.filename}`;
+            document.size = req.file.size;
+
+            document.save()
+                .then((savedDocument) => res.send(savedDocument));
+        });
+    });
 });
 
 router.delete('/:documentId', async (req, res, next) => {
@@ -90,7 +124,18 @@ router.delete('/:documentId', async (req, res, next) => {
         $pull: { documents: req.params.documentId }
     });
 
-    res.send(document);
+    let deletedFilePathInDiskStorage = path.join(process.cwd(), document.path);
+
+    // Remove the deleted document in disk
+    fs.access(deletedFilePathInDiskStorage, (err) => {
+        if(!err) {
+            fs.unlink(deletedFilePathInDiskStorage, (err) => {
+                if(err) res.status(500).send('Silinmek istenen doküman diskten silinemedi.');
+            });
+        }
+
+        res.send(document);
+    });
 });
 
 module.exports = router;

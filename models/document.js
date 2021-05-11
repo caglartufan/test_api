@@ -10,12 +10,6 @@ const documentSchema = new mongoose.Schema({
         type: String,
         required: true
     },
-    encoding: {
-        type: String
-    },
-    mimetype: {
-        type: String
-    },
     size: {
         type: Number,
         required: true

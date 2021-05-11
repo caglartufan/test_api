@@ -1,8 +1,0 @@
-{
-    "name": "test",
-    "fiels": {
-        "field1": 5,
-        "field2": 2,
-        "field3": [1, 3]
-    }
-}

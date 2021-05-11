@@ -1,7 +1,7 @@
 const { User, validate } = require('../models/user');
 const { Document } = require('../models/document');
 const mongoose = require('mongoose');
-const Joi = require('joi');
+const debug = require('debug')('api:users');
 const express = require('express');
 const router = express.Router();
 
@@ -20,7 +20,7 @@ router.get('/:id', async (req, res, next) => {
 });
 
 router.post('/', async (req, res, next) => {
-    const { error } = validate(req.body);
+    let { error } = validate(req.body);
     if(error) return res.status(400).send(error.details[0].message);
 
     let user = await User.findOne({ username: req.body.username });
@@ -30,9 +30,14 @@ router.post('/', async (req, res, next) => {
         username: req.body.username,
         password: req.body.password
     });
-    user = await user.save();
 
-    res.send(user);
+    // Catch validation errors
+    try{
+        user = await user.save();
+        res.send(user);
+    } catch(exception) {
+        res.status(400).send(exception.errors[Object.keys(exception.errors)[0]].properties.message);
+    }
 });
 
 router.put('/:id', async (req, res, next) => {
@@ -44,13 +49,18 @@ router.put('/:id', async (req, res, next) => {
     let user = await User.findOne({ username: req.body.username });
     if(user && user._id != req.params.id) return res.status(400).send('Girmiş olduğunuz kullanıcı adı kullanımda.');
 
-    user = await User.findByIdAndUpdate(req.params.id, {
-        username: req.body.username,
-        password: req.body.password
-    }, { new: true });
-    if(!user) return res.status(404).send('Verilen ID değerine sahip kullanıcı bulnamadı.');
+    // Catch validation errors
+    try {
+        user = await User.findByIdAndUpdate(req.params.id, {
+            username: req.body.username,
+            password: req.body.password
+        }, { new: true, runValidators: true });
+        if(!user) return res.status(404).send('Verilen ID değerine sahip kullanıcı bulnamadı.');
 
-    res.send(user);
+        res.send(user);
+    } catch(exception) {
+        res.status(400).send(exception.errors[Object.keys(exception.errors)[0]].properties.message);
+    }
 });
 
 router.delete('/:id', async (req, res, next) => {

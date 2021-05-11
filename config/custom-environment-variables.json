@@ -1,0 +1,8 @@
+{
+    "bcyrpt": {
+        "salt": "api_bcryptSalt"
+    },
+    "jwt": {
+        "privateKey": "api_jwtPrivateKey"
+    }
+}

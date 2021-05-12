@@ -5,6 +5,8 @@ const multer = require('multer');
 const jsonFileFilter = require('./../helpers/jsonFileFilter');
 const path = require('path');
 const fs = require('fs');
+const auth = require('./../middlewares/auth');
+const admin = require('./../middlewares/admin');
 const express = require('express');
 const router = express.Router();
 
@@ -31,12 +33,127 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage: storage, fileFilter: jsonFileFilter }).single('document');
 
-router.get('/', async (req, res, next) => {
+// User routes
+router.get('/mine', auth, async (req, res, next) => {
+    const { documents } = await User.findById(req.user._id)
+        .select('documents')
+        .populate('documents');
+    res.send(documents);
+});
+
+router.get('/mine/:documentId', auth, async (req, res, next) => {
+    if(!mongoose.Types.ObjectId.isValid(req.params.documentId)) return res.status(400).send('Girilen ID değeri uygun değil.');
+
+    const document = await Document.findById(req.params.documentId);
+    if(!document) return res.status(404).send('Verilen ID değerine sahip doküman bulunamadı');
+
+    const user = await User.findById(req.user._id)
+        .select('documents');
+    if(user.documents.indexOf(req.params.documentId) < 0) return res.status(404).send('Verilen ID değerine sahip doküman bulunamadı');
+
+    res.send(document);
+});
+
+router.post('/mine', auth, async (req, res, next) => {
+    const user = await User.findById(req.user._id)
+        .select('documents');
+
+    req.fileUploadFolderName = req.user.username;
+
+    upload(req, res, function(err) {
+        if(req.fileValidationError) return res.status(400).send(req.fileValidationError.message);
+        else if(!req.file) return res.status(400).send('Herhangi bir doküman seçilmedi.');
+        else if(err instanceof multer.MulterError) return res.status(500).send(err);
+        else if(err) return res.status(500).send(err);
+
+        let document = new Document({
+            filename: req.file.filename,
+            path: `/uploads/${req.fileUploadFolderName}/${req.file.filename}`,
+            size: req.file.size
+        });
+
+        document.save()
+            .then((savedDocument) => {
+                user.documents.push(savedDocument._id);
+                user.save()
+                    .then(() => res.send(savedDocument));
+            });
+    });
+});
+
+router.put('/mine/:documentId', auth, async (req, res, next) => {
+    if(!mongoose.Types.ObjectId.isValid(req.params.documentId)) return res.status(400).send('Girilen ID değeri uygun değil.');
+    
+    const document = await Document.findById(req.params.documentId);
+    if(!document) return res.status(404).send('Verilen ID değerine sahip doküman bulunamadı.');
+
+    const user = await User.findById(req.user._id)
+        .select('documents');
+    if(user.documents.indexOf(req.params.documentId) < 0) return res.status(404).send('Verilen ID değerine sahip doküman bulunamadı');
+
+    req.fileUploadFolderName = req.user.username;
+
+    upload(req, res, function(err) {
+        if(req.fileValidationError) return res.status(400).send(req.fileValidationError.message);
+        else if(!req.file) return res.status(400).send('Herhangi bir doküman seçilmedi.');
+        else if(err instanceof multer.MulterError) return res.status(500).send(err);
+        else if(err) return res.status(500).send(err);
+
+        let oldFilePathInDiskStorage = path.join(process.cwd(), document.path);
+
+        // Check if the old file exists or not
+        fs.access(oldFilePathInDiskStorage, (err) => {
+            // If the old file exist remove it
+            if(!err) {
+                fs.unlink(oldFilePathInDiskStorage, (err) => {
+                    if(err) return res.status(500).send('Düzenlenmek istenen dökümanın eski sürümü silinemedi.');
+                });
+            }
+
+            document.filename = req.file.filename;
+            document.path = `/uploads/${req.fileUploadFolderName}/${req.file.filename}`;
+            document.size = req.file.size;
+
+            document.save()
+                .then((savedDocument) => res.send(savedDocument));
+        });
+    });
+});
+
+router.delete('/mine/:documentId', auth, async (req, res, next) => {
+    if(!mongoose.Types.ObjectId.isValid(req.params.documentId)) return res.status(400).send('Girilen ID değeri uygun değil.');
+
+    const user = await User.findById(req.user._id)
+        .select('documents');
+    if(user.documents.indexOf(req.params.documentId) < 0) return res.status(404).send('Verilen ID değerine sahip doküman bulunamadı');
+
+    const document = await Document.findOneAndRemove({ _id: req.params.documentId });
+    if(!document) return res.status(404).send('Verilen ID değerine sahip doküman bulunamadı.');
+    
+    user.documents.splice(user.documents.indexOf(req.params.documentId), 1);
+
+    let deletedFilePathInDiskStorage = path.join(process.cwd(), document.path);
+
+    // Remove the deleted document in disk
+    fs.access(deletedFilePathInDiskStorage, (err) => {
+        if(!err) {
+            fs.unlink(deletedFilePathInDiskStorage, (err) => {
+                if(err) res.status(500).send('Silinmek istenen doküman diskten silinemedi.');
+            });
+        }
+
+        user.save()
+            .then(() => res.send(document));
+    });
+});
+
+// Administration routes
+router.get('/', [auth, admin], async (req, res, next) => {
     const documents = await Document.find().sort('uploadDate');
     res.send(documents);
 });
 
-router.get('/:userId', async (req, res, next) => {
+router.get('/:userId', [auth, admin], async (req, res, next) => {
     if(!mongoose.Types.ObjectId.isValid(req.params.userId)) return res.status(400).send('Girilen ID değeri uygun değil.');
 
     const user = await User.findById(req.params.userId)
@@ -47,7 +164,7 @@ router.get('/:userId', async (req, res, next) => {
     res.send(user.documents);
 });
 
-router.post('/:userId', async (req, res, next) => {
+router.post('/:userId', [auth, admin], async (req, res, next) => {
     if(!mongoose.Types.ObjectId.isValid(req.params.userId)) return res.status(400).send('Girilen ID değeri uygun değil.');
 
     let user = await User.findById(req.params.userId)
@@ -77,7 +194,7 @@ router.post('/:userId', async (req, res, next) => {
     });
 });
 
-router.put('/:documentId', async (req, res, next) => {
+router.put('/:documentId', [auth, admin], async (req, res, next) => {
     if(!mongoose.Types.ObjectId.isValid(req.params.documentId)) return res.status(400).send('Girilen ID değeri uygun değil');
 
     let document = await Document.findById(req.params.documentId);
@@ -101,7 +218,7 @@ router.put('/:documentId', async (req, res, next) => {
             // If the old file exist remove it
             if(!err) {
                 fs.unlink(oldFilePathInDiskStorage, (err) => {
-                    if(err) res.status(500).send('Düzenlenmek istenen dökümanın eski sürümü silinemedi.');
+                    if(err) return res.status(500).send('Düzenlenmek istenen dökümanın eski sürümü silinemedi.');
                 });
             }
 
@@ -115,7 +232,7 @@ router.put('/:documentId', async (req, res, next) => {
     });
 });
 
-router.delete('/:documentId', async (req, res, next) => {
+router.delete('/:documentId', [auth, admin], async (req, res, next) => {
     if(!mongoose.Types.ObjectId.isValid(req.params.documentId)) return res.status(400).send('Girilen ID değerleri uygun değil');
 
     const document = await Document.findOneAndRemove({ _id: req.params.documentId });

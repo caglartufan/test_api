@@ -13,13 +13,22 @@ const debug = require('debug')('api:server');
 const http = require('http');
 
 /**
- * Connect to MongoDB
+ * Check if configs needed to run are set
  */
 
 if(!config.get('mongoDB.connectionString')) {
     debug('FATAL ERROR: MongoDB connection string is not defined. Terminating process...');
     process.exit(1);
 }
+
+if(!config.get('jwt.privateKey')) {
+    debug('FATAL ERROR: JSON Web Token private key is not defined. Terminating process...');
+    process.exit(1);
+}
+
+/**
+ * Connect to MongoDB
+ */
 
 mongoose.connect(config.get('mongoDB.connectionString'), { useNewUrlParser: true, useUnifiedTopology: true, useCreateIndex: true, useFindAndModify: false })
     .then(() => debug('Connected to MongoDB...'))

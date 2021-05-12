@@ -17,7 +17,7 @@ const http = require('http');
  */
 
 if(!config.get('mongoDB.connectionString')) {
-    console.error('FATAL ERROR: MongoDB connection string is not defined.');
+    debug('FATAL ERROR: MongoDB connection string is not defined. Terminating process...');
     process.exit(1);
 }
 

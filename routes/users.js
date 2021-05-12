@@ -10,13 +10,41 @@ const admin = require('./../middlewares/admin');
 const express = require('express');
 const router = express.Router();
 
-// User routes 
+/**
+ * @api {get} /users/me Request the authorized user
+ * @apiHeader {String} x-auth-token JWT authorization token
+ * @apiName GetUser
+ * @apiGroup User
+ *
+ *
+ * @apiSuccess {String} _id ObjectId of the authorized user.
+ * @apiSuccess {String} username Username of the authorized user.
+ * @apiSuccess {String[]} documents Array of document ObjectIds of the authorized user.
+ * @apiSuccess {String} joinDate Join date of the authorized user.
+ * @apiSuccess {Number} __v Version of the user object.
+ *
+ * @apiSuccessExample Success-Response:
+ *     HTTP/1.1 200 OK
+ *     {
+ *       "_id": "609c424a2cee6929d4acfdc2",
+ *       "username": "johndoe",
+ *       "documents": [
+ *         "609c424a2cee6929d4acfdc3",
+ *         "609c424a2cee6929d4acfdc4"
+ *       ],
+ *       "joinDate": "2021-05-12T21:02:02.126Z",
+ *       "__v": 0
+ *     }
+ */
 router.get('/me', auth, async (req, res, next) => {
     const user = await User.findById(req.user._id)
         .select('-password -isAdmin');
     res.send(user);
 });
 
+/**
+ * USER ROUTE 2
+ */
 router.put('/me', auth, async (req, res, next) => {
     const { error } = validate(req.body);
     if(error) return res.status(400).send(error.details[0].message);
@@ -41,12 +69,17 @@ router.put('/me', auth, async (req, res, next) => {
     }
 });
 
-// Administration routes
+/**
+ * ADMINISTRATION ROUTE 1
+ */
 router.get('/', [auth, admin], async (req, res, next) => {
     const users = await User.find().sort('name');
     res.send(users);
 });
 
+/**
+ * ADMINISTRATION ROUTE 2
+ */
 router.get('/:id', [auth, admin], async (req, res, next) => {
     if(!mongoose.Types.ObjectId.isValid(req.params.id)) return res.status(400).send('Girilen ID değeri uygun değil.');
 
@@ -56,6 +89,9 @@ router.get('/:id', [auth, admin], async (req, res, next) => {
     res.send(user);
 });
 
+/**
+ * ADMINISTRATION ROUTE 3
+ */
 router.post('/', async (req, res, next) => {
     let { error } = validate(req.body);
     if(error) return res.status(400).send(error.details[0].message);
@@ -81,6 +117,9 @@ router.post('/', async (req, res, next) => {
     }
 });
 
+/**
+ * ADMINISTRATION ROUTE 4
+ */
 router.put('/:id', [auth, admin], async (req, res, next) => {
     if(!mongoose.Types.ObjectId.isValid(req.params.id)) return res.status(400).send('Girilen ID değeri uygun değil.');
 
@@ -106,6 +145,9 @@ router.put('/:id', [auth, admin], async (req, res, next) => {
     }
 });
 
+/**
+ * ADMINISTRATION ROUTE 5
+ */
 router.delete('/:id', [auth, admin], async (req, res, next) => {
     if(!mongoose.Types.ObjectId.isValid(req.params.id)) return res.status(400).send('Girilen ID değeri uygun değil.');
 

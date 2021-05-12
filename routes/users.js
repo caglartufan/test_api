@@ -2,7 +2,6 @@ const { User, validate } = require('../models/user');
 const { Document } = require('../models/document');
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
-const _ = require('lodash');
 const express = require('express');
 const router = express.Router();
 
@@ -27,7 +26,10 @@ router.post('/', async (req, res, next) => {
     let user = await User.findOne({ username: req.body.username });
     if(user) return res.status(400).send('Girmiş olduğunuz kullanıcı adı kullanımda.');
 
-    user = new User(_.pick(req.body, ['username', 'password']));
+    user = new User({
+        username: req.body.username,
+        password: req.body.password
+    });
     const salt = await bcrypt.genSalt(10);
     user.password = await bcrypt.hash(user.password, salt);
 

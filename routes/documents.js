@@ -19,9 +19,10 @@ const storage = multer.diskStorage({
                     if(err) throw err;
                     cb(null, uploadDestination);
                 });
+            } else {
+                // Directory with username exists
+                cb(null, uploadDestination);
             }
-            // Directory with username exists
-            cb(null, uploadDestination);
         });
     },
     filename: function(req, file, cb) {

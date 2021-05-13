@@ -17,7 +17,8 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
-app.use(express.static(path.join(__dirname, 'uploads')));
+app.use('/uploads/', express.static(path.join(__dirname, 'uploads')));
+app.use('/documentation', express.static(path.join(__dirname, 'apidoc')));
 
 app.use('/api/auth', authRouter);
 app.use('/api/documents', documentsRouter);

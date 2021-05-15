@@ -1,7 +1,7 @@
 const jwt = require('jsonwebtoken');
 const config = require('config');
 const path = require('path');
-const { bytesToMb, mbToBytes } = require('./../helpers/sizeConverter');
+const { mbToBytes } = require('./../helpers/sizeConverter');
 const readFolderSize = require('./../helpers/readFolderSize');
 const Joi = require('joi');
 const mongoose = require('mongoose');
@@ -26,10 +26,6 @@ const userSchema = new mongoose.Schema({
         minlength: 4,
         maxlength: 1024
     },
-    isAdmin: {
-        type: Boolean,
-        default: false
-    },
     plan: {
         type: String,
         enum: Object.keys(config.get('plans')),
@@ -48,7 +44,6 @@ const userSchema = new mongoose.Schema({
 userSchema.methods.generateAuthToken = function() {
     const token = jwt.sign({
         _id: this._id,
-        isAdmin: this.isAdmin,
         plan: this.plan,
         username: this.username
     }, config.get('jwt.privateKey'));

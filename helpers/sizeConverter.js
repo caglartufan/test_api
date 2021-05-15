@@ -1,5 +1,5 @@
-function bytesToMb(bytes) {
-    return bytes/Math.pow(2, 20);
+function bytesToMb(bytes, fixed) {
+    return fixed ? Math.round((bytes/Math.pow(2, 20) + Number.EPSILON)*100)/100 : bytes/Math.pow(2, 20);
 }
 
 function mbToBytes(mb) {

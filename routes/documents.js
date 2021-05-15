@@ -1,39 +1,13 @@
 const { User } = require('../models/user');
 const { Document } = require('../models/document');
-const mongoose = require('mongoose');
-const multer = require('multer');
-const jsonFileFilter = require('./../helpers/jsonFileFilter');
 const isValidObjectId = require('./../helpers/isValidObjectId');
 const createError = require('./../helpers/createError');
 const path = require('path');
 const fs = require('fs');
 const auth = require('./../middlewares/auth');
-const admin = require('./../middlewares/admin');
+const uploadFile = require('./../middlewares/uploadFile');
 const express = require('express');
 const router = express.Router();
-
-const storage = multer.diskStorage({
-    destination: function(req, file, cb) {
-        if(!req.fileUploadFolderName) return cb(new Error('Dokümanın yükleneceği klasör için isim belirtilmemiş.'), null);
-        let uploadDestination = path.join(process.cwd(), 'uploads', req.fileUploadFolderName);
-        fs.access(uploadDestination, (err) => {
-            if(err) {
-                // Directory with username doesn't exist in uploads folder, so create one
-                fs.mkdir(uploadDestination, (err) => {
-                    if(err) cb(err, null);
-                    cb(null, uploadDestination);
-                });
-            } else {
-                // Directory with username exists
-                cb(null, uploadDestination);
-            }
-        });
-    },
-    filename: function(req, file, cb) {
-        cb(null, `${file.originalname.replace('.json', '')}--${Date.now()}.json`);
-    }
-});
-const upload = multer({ storage: storage, fileFilter: jsonFileFilter }).single('document');
 
 /**
  * @api {get} /documents/mine 1. Request the authorized user's documents as a list
@@ -71,7 +45,7 @@ const upload = multer({ storage: storage, fileFilter: jsonFileFilter }).single('
  *       }
  *     ]
  */
-router.get('/mine', auth, async (req, res, next) => {
+router.get('/mine', auth, async (req, res) => {
     const { documents } = await User.findById(req.user._id)
         .select('documents')
         .populate('documents');
@@ -123,7 +97,7 @@ router.get('/mine', auth, async (req, res, next) => {
  *       }
  *     }
  */
-router.get('/mine/:documentId', auth, async (req, res, next) => {
+router.get('/mine/:documentId', auth, async (req, res) => {
     if(!isValidObjectId(req.params.documentId)) return res.status(400).send(createError('Girilen ID değeri uygun değil.', 400));
 
     const document = await Document.findById(req.params.documentId);
@@ -183,49 +157,40 @@ router.get('/mine/:documentId', auth, async (req, res, next) => {
  *       }
  *     }
  */
-router.post('/mine', auth, async (req, res, next) => {
-    const user = await User.findById(req.user._id)
-        .select('documents plan');
+router.post('/mine', [auth, uploadFile], async (req, res) => {
+    const user = await User.findById(req.user._id);
 
-    req.fileUploadFolderName = req.user.username;
-
-    /*upload(req, res, function(err) {
-        if(req.fileValidationError) return res.status(400).send(createError(req.fileValidationError.message, 400));
-        else if(!req.file) return res.status(400).send(createError('Herhangi bir doküman seçilmedi.', 400));
-        else if(err instanceof multer.MulterError) return res.status(500).send(createError(err, 500));
-        else if(err) return res.status(500).send(createError(err, 500));
-
-        user.leftDiskSpace(function(err, leftSpace) {
-            if(err) {
-                return res.status(400).send(createError(err.message, 400));
-            } else {
-                if(req.file.size > leftSpace) {
-                    fs.access(req.file.path, (err) => {
-                        if(!err) {
-                            fs.unlink(req.file.path, (err) => {
-                                if(err) res.status(500).send('Silinmek istenen doküman diskten silinemedi.');
-                            });
-                        }
-                
-                        return res.status(403).send(createError('Your plan\'s disk space is exceeded.', 403));
-                    });
-                } else {
-                    let document = new Document({
-                        filename: req.file.filename,
-                        path: `/uploads/${req.fileUploadFolderName}/${req.file.filename}`,
-                        size: req.file.size
-                    });
-            
-                    document.save()
-                        .then((savedDocument) => {
-                            user.documents.push(savedDocument._id);
-                            user.save()
-                                .then(() => res.send(savedDocument));
+    user.leftDiskSpace(function(err, leftSpace) {
+        if(err) {
+            return res.status(400).send(createError(err.message, 400));
+        } else {
+            if(leftSpace < 0) {
+                fs.access(req.file.path, (err) => {
+                    if(err) {
+                        res.status(403).send(createError('Your plan\'s disk space is exceeded.', 403));
+                    } else {
+                        fs.unlink(req.file.path, (err) => {
+                            if(err) res.status(500).send('Silinmek istenen doküman diskten silinemedi.');
+                            else res.status(403).send(createError('Your plan\'s disk space is exceeded.', 403));
                         });
-                }
+                    }
+                });
+            } else {
+                let document = new Document({
+                    filename: req.file.filename,
+                    path: `/uploads/${req.user.username}/${req.file.filename}`,
+                    size: req.file.size
+                });
+        
+                document.save()
+                    .then((savedDocument) => {
+                        user.documents.push(savedDocument._id);
+                        user.save()
+                            .then(() => res.send(savedDocument));
+                    });
             }
-        });
-    });*/
+        }
+    });
 });
 
 /**
@@ -293,60 +258,60 @@ router.post('/mine', auth, async (req, res, next) => {
  *       }
  *     }
  */
-router.put('/mine/:documentId', auth, async (req, res, next) => {
+router.put('/mine/:documentId', [auth, uploadFile], async (req, res) => {
     if(!isValidObjectId(req.params.documentId)) return res.status(400).send(createError('Girilen ID değeri uygun değil.', 400));
     
     const document = await Document.findById(req.params.documentId);
     if(!document) return res.status(404).send(createError('Verilen ID değerine sahip doküman bulunamadı.', 404));
 
-    const user = await User.findById(req.user._id)
-        .select('documents plan');
+    const user = await User.findById(req.user._id);
     if(user.documents.indexOf(req.params.documentId) < 0) return res.status(404).send(createError('Verilen ID değerine sahip doküman bulunamadı', 404));
 
-    req.fileUploadFolderName = req.user.username;
-
-    upload(req, res, function(err) {
-        if(req.fileValidationError) return res.status(400).send(createError(req.fileValidationError.message, 400));
-        else if(!req.file) return res.status(400).send(createError('Herhangi bir doküman seçilmedi.', 400));
-        else if(err instanceof multer.MulterError) return res.status(500).send(createError(err, 500));
-        else if(err) return res.status(500).send(createError(err, 500));
-
-        user.leftDiskSpace(function(err, leftSpace) {
-            if(err) {
-                return res.status(400).send(createError(err.message, 400));
+    user.leftDiskSpace(function(err, leftSpace) {
+        if(err) {
+            return res.status(400).send(createError(err.message, 400));
+        } else {
+            // Check if the user's directory size with uploaded file minus old file size
+            // exceeds the limits of user
+            if((leftSpace + document.size) < 0) {
+                fs.access(req.file.path, (err) => {
+                    if(!err) {
+                        fs.unlink(req.file.path, (err) => {
+                            if(err) res.status(500).send('Silinmek istenen doküman diskten silinemedi.');
+                            else res.status(403).send(createError('Your plan\'s disk space is exceeded.', 403));
+                        });
+                    }
+                });
             } else {
-                if(req.file.size > leftSpace) {
-                    fs.access(req.file.path, (err) => {
-                        if(!err) {
-                            fs.unlink(req.file.path, (err) => {
-                                if(err) res.status(500).send('Silinmek istenen doküman diskten silinemedi.');
-                            });
-                        }
-                
-                        return res.status(403).send(createError('Your plan\'s disk space is exceeded.', 403));
-                    });
-                } else {
-                    let oldFilePathInDiskStorage = path.join(process.cwd(), document.path);
+                let oldFilePathInDiskStorage = path.join(process.cwd(), document.path);
 
-                    // Check if the old file exists or not
-                    fs.access(oldFilePathInDiskStorage, (err) => {
-                        // If the old file exist remove it
-                        if(!err) {
-                            fs.unlink(oldFilePathInDiskStorage, (err) => {
-                                if(err) return res.status(500).send(createError('Düzenlenmek istenen dökümanın eski sürümü silinemedi.', 500));
-                            });
-                        }
-
+                // Check if the old file exists or not
+                fs.access(oldFilePathInDiskStorage, (err) => {
+                    if(err) {
                         document.filename = req.file.filename;
-                        document.path = `/uploads/${req.fileUploadFolderName}/${req.file.filename}`;
+                        document.path = `/uploads/${req.user.username}/${req.file.filename}`;
                         document.size = req.file.size;
-
+            
                         document.save()
                             .then((savedDocument) => res.send(savedDocument));
-                    });
-                }
+                    } else {
+                        // If the old file exist, remove it
+                        fs.unlink(oldFilePathInDiskStorage, (err) => {
+                            if(err) {
+                                return res.status(500).send(createError('Düzenlenmek istenen dökümanın eski sürümü silinemedi.', 500));
+                            } else {
+                                document.filename = req.file.filename;
+                                document.path = `/uploads/${req.user.username}/${req.file.filename}`;
+                                document.size = req.file.size;
+            
+                                document.save()
+                                    .then((savedDocument) => res.send(savedDocument));
+                            }
+                        });
+                    }
+                });
             }
-        });
+        }
     });
 });
 
@@ -395,7 +360,7 @@ router.put('/mine/:documentId', auth, async (req, res, next) => {
  *       }
  *     }
  */
-router.delete('/mine/:documentId', auth, async (req, res, next) => {
+router.delete('/mine/:documentId', auth, async (req, res) => {
     if(!isValidObjectId(req.params.documentId)) return res.status(400).send(createError('Girilen ID değeri uygun değil.', 400));
 
     const user = await User.findById(req.user._id)
@@ -411,123 +376,14 @@ router.delete('/mine/:documentId', auth, async (req, res, next) => {
 
     // Remove the deleted document in disk
     fs.access(deletedFilePathInDiskStorage, (err) => {
-        if(!err) {
+        if(err) {
+            user.save().then(() => res.send(document));
+        } else {
             fs.unlink(deletedFilePathInDiskStorage, (err) => {
                 if(err) res.status(500).send('Silinmek istenen doküman diskten silinemedi.');
+                else user.save().then(() => res.send(document));
             });
         }
-
-        user.save()
-            .then(() => res.send(document));
-    });
-});
-
-// Administration routes
-router.get('/', [auth, admin], async (req, res, next) => {
-    const documents = await Document.find().sort('uploadDate');
-    res.send(documents);
-});
-
-router.get('/:userId', [auth, admin], async (req, res, next) => {
-    if(!mongoose.Types.ObjectId.isValid(req.params.userId)) return res.status(400).send('Girilen ID değeri uygun değil.');
-
-    const user = await User.findById(req.params.userId)
-        .select('documents')
-        .populate('documents');
-    if(!user) return res.status(404).send('Verilen ID değerine sahip kullanıcı bulunamadı.');
-
-    res.send(user.documents);
-});
-
-router.post('/:userId', [auth, admin], async (req, res, next) => {
-    if(!mongoose.Types.ObjectId.isValid(req.params.userId)) return res.status(400).send('Girilen ID değeri uygun değil.');
-
-    let user = await User.findById(req.params.userId)
-        .select('documents username');
-    if(!user) return res.status(404).send('Verilen ID değerine sahip kullanıcı bulunamadı.');
-
-    req.fileUploadFolderName = user.username;
-
-    upload(req, res, function(err) {
-        if(req.fileValidationError) return res.status(400).send(req.fileValidationError.message);
-        else if(!req.file) return res.status(400).send('Herhangi bir doküman seçilmedi.');
-        else if(err instanceof multer.MulterError) return res.status(500).send(err);
-        else if(err) return res.status(500).send(err);
-
-        let document = new Document({
-            filename: req.file.filename,
-            path: `/uploads/${req.fileUploadFolderName}/${req.file.filename}`,
-            size: req.file.size
-        });
-
-        document.save()
-            .then((savedDocument) => {
-                user.documents.push(savedDocument._id);
-                user.save()
-                    .then(() => res.send(savedDocument));
-            });
-    });
-});
-
-router.put('/:documentId', [auth, admin], async (req, res, next) => {
-    if(!mongoose.Types.ObjectId.isValid(req.params.documentId)) return res.status(400).send('Girilen ID değeri uygun değil');
-
-    let document = await Document.findById(req.params.documentId);
-    if(!document) return res.status(404).send('Verilen ID değerine sahip doküman bulunamadı.');
-
-    let { username } = await User.findOne({ documents: req.params.documentId })
-        .select('username');
-    
-    req.fileUploadFolderName = username;
-
-    upload(req, res, function(err) {
-        if(req.fileValidationError) return res.status(400).send(req.fileValidationError.message);
-        else if(!req.file) return res.status(400).send('Herhangi bir doküman seçilmedi.');
-        else if(err instanceof multer.MulterError) return res.status(500).send(err);
-        else if(err) return res.status(500).send(err);
-
-        let oldFilePathInDiskStorage = path.join(process.cwd(), document.path);
-
-        // Check if the old file exists or not
-        fs.access(oldFilePathInDiskStorage, (err) => {
-            // If the old file exist remove it
-            if(!err) {
-                fs.unlink(oldFilePathInDiskStorage, (err) => {
-                    if(err) return res.status(500).send('Düzenlenmek istenen dökümanın eski sürümü silinemedi.');
-                });
-            }
-
-            document.filename = req.file.filename;
-            document.path = `/uploads/${req.fileUploadFolderName}/${req.file.filename}`;
-            document.size = req.file.size;
-
-            document.save()
-                .then((savedDocument) => res.send(savedDocument));
-        });
-    });
-});
-
-router.delete('/:documentId', [auth, admin], async (req, res, next) => {
-    if(!mongoose.Types.ObjectId.isValid(req.params.documentId)) return res.status(400).send('Girilen ID değerleri uygun değil');
-
-    const document = await Document.findOneAndRemove({ _id: req.params.documentId });
-    if(!document) return res.status(404).send('Verilen ID değerine sahip doküman bulunamadı.');
-
-    await User.findOneAndUpdate({ documents: req.params.documentId }, {
-        $pull: { documents: req.params.documentId }
-    });
-
-    let deletedFilePathInDiskStorage = path.join(process.cwd(), document.path);
-
-    // Remove the deleted document in disk
-    fs.access(deletedFilePathInDiskStorage, (err) => {
-        if(!err) {
-            fs.unlink(deletedFilePathInDiskStorage, (err) => {
-                if(err) res.status(500).send('Silinmek istenen doküman diskten silinemedi.');
-            });
-        }
-
-        res.send(document);
     });
 });
 

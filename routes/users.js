@@ -1,14 +1,11 @@
 const { User, validate } = require('../models/user');
-const { Document } = require('../models/document');
-const mongoose = require('mongoose');
 const fs = require('fs');
 const path = require('path');
 const bcrypt = require('bcrypt');
 const _ = require('lodash');
 const auth = require('./../middlewares/auth');
-const admin = require('./../middlewares/admin');
-const isValidObjectId = require('./../helpers/isValidObjectId');
 const createError = require('./../helpers/createError');
+const { bytesToMb } = require('./../helpers/sizeConverter');
 const express = require('express');
 const router = express.Router();
 
@@ -39,22 +36,48 @@ const router = express.Router();
  *       "__v": 0
  *     }
  */
-router.get('/me', auth, async (req, res, next) => {
+router.get('/me', auth, async (req, res) => {
     const user = await User.findById(req.user._id)
         .select('-password -isAdmin');
     res.send(user);
 });
 
-router.get('/left-disk-space', auth, async (req, res, next) => {
+
+/**
+ * @api {get} /users/me/left-disk-space 2. Request the authorized user's left disk space
+ * @apiVersion 0.1.0
+ * @apiHeader {String} x-auth-token JWT authorization token
+ * @apiName GetLeftDiskSpace
+ * @apiGroup Users
+ *
+ * @apiParam {String} round Set round query parameter to <code>false</code> if you want <code>leftDiskSpaceInMbs</code> value to not rounded.
+ * 
+ * @apiSuccess {Number} leftDiskSpaceInBytes Authorized user's left disk space in bytes.
+ * @apiSuccess {Number} leftDiskSpaceInMbs Authorized user's left disk space in MBs.
+ *
+ * @apiSuccessExample Success-Response:
+ *     HTTP/1.1 200 OK
+ *     {
+ *       "leftDiskSpaceInBytes": 52428203,
+ *       "leftDiskSpaceInMbs": 50
+ *     }
+ */
+router.get('/me/left-disk-space', auth, async (req, res) => {
     const user = await User.findById(req.user._id);
+
+    let roundFlag = req.query.round && req.query.round.trim().toLowerCase() === 'false' ? false : true;
+
     user.leftDiskSpace(function(err, leftSpace) {
         if(err) return res.status(400).send(createError(err.message));
-        res.send({ leftDiskSpace: leftSpace });
+        res.send({
+            leftDiskSpaceInBytes: leftSpace,
+            leftDiskSpaceInMbs: bytesToMb(leftSpace, roundFlag)
+        });
     });
 });
 
 /**
- * @api {put} /users/me 2. Update the authorized user
+ * @api {put} /users/me 3. Update the authorized user
  * @apiVersion 0.1.0
  * @apiHeader {String} x-auth-token JWT authorization token
  * @apiName PutMe
@@ -105,7 +128,7 @@ router.get('/left-disk-space', auth, async (req, res, next) => {
  *       }
  *     }
  */
-router.put('/me', auth, async (req, res, next) => {
+router.put('/me', auth, async (req, res) => {
     const { error } = validate(req.body);
     if(error) return res.status(400).send(error.details[0].message);
     
@@ -131,106 +154,6 @@ router.put('/me', auth, async (req, res, next) => {
     } catch(exception) {
         res.status(400).send(createError(exception.errors[Object.keys(exception.errors)[0]].properties.message, 400));
     }
-});
-
-/**
- * ADMINISTRATION ROUTE 1
- */
-router.get('/', [auth, admin], async (req, res, next) => {
-    const users = await User.find().sort('name');
-    res.send(users);
-});
-
-/**
- * ADMINISTRATION ROUTE 2
- */
-router.get('/:id', [auth, admin], async (req, res, next) => {
-    if(!isValidObjectId(req.params.id)) return res.status(400).send('Girilen ID değeri uygun değil.');
-
-    const user = await User.findById(req.params.id);
-    if(!user) return res.status(404).send('Verilen ID değerine sahip kullanıcı bulunamadı.');
-
-    res.send(user);
-});
-
-/**
- * ADMINISTRATION ROUTE 3
- */
-router.post('/', async (req, res, next) => {
-    let { error } = validate(req.body);
-    if(error) return res.status(400).send(error.details[0].message);
-
-    let user = await User.findOne({ username: req.body.username });
-    if(user) return res.status(400).send('Girmiş olduğunuz kullanıcı adı kullanımda.');
-
-    user = new User({
-        username: req.body.username,
-        password: req.body.password
-    });
-    const salt = await bcrypt.genSalt(10);
-    user.password = await bcrypt.hash(user.password, salt);
-
-    // Catch validation errors
-    try{
-        user = await user.save();
-
-        const token = user.generateAuthToken();
-        res.header('x-auth-token', token).send(_.pick(user, ['_id', 'username', 'joinDate']));
-    } catch(exception) {
-        res.status(400).send(exception.errors[Object.keys(exception.errors)[0]].properties.message);
-    }
-});
-
-/**
- * ADMINISTRATION ROUTE 4
- */
-router.put('/:id', [auth, admin], async (req, res, next) => {
-    if(!isValidObjectId(req.params.id)) return res.status(400).send('Girilen ID değeri uygun değil.');
-
-    const { error } = validate(req.body);
-    if(error) return res.status(400).send(error.details[0].message);
-
-    let user = await User.findOne({ username: req.body.username });
-    if(user && user._id != req.params.id) return res.status(400).send('Girmiş olduğunuz kullanıcı adı kullanımda.');
-
-    user = await User.findById(req.params.id);
-    if(!user) return res.status(404).send('Verilen ID değerine sahip kullanıcı bulunamadı.');
-
-    user.username = req.body.username;
-    const salt = await bcrypt.genSalt(10);
-    user.password = await bcrypt.hash(req.body.password, salt);
-
-    // Catch validation errors
-    try {
-        user = await user.save();
-        res.send(user);
-    } catch(exception) {
-        res.status(400).send(exception.errors[Object.keys(exception.errors)[0]].properties.message);
-    }
-});
-
-/**
- * ADMINISTRATION ROUTE 5
- */
-router.delete('/:id', [auth, admin], async (req, res, next) => {
-    if(!isValidObjectId(req.params.id)) return res.status(400).send('Girilen ID değeri uygun değil.');
-
-    const user = await User.findOneAndRemove({ _id: req.params.id });
-    if(!user) return res.status(404).send('Verilen ID değerine sahip kullanıcı bulunamadı.');
-
-    if(user.documents.length) {
-        await Document.deleteMany({ _id: { $in: user.documents } });
-        let userUploadsPath = path.join(process.cwd(), 'uploads', user.username);
-        fs.access(userUploadsPath, (err) => {
-            if(!err) {
-                fs.rm(userUploadsPath, { recursive: true }, (err) => {
-                    if(err) throw err;
-                });
-            }
-        });
-    }
-
-    res.send(user);
 });
 
 module.exports = router;

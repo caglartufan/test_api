@@ -11,7 +11,6 @@ function readFolderSize(folderPath) {
             return new Promise((resolve, reject) => {
                 let size = 0;
                 async.each(files, function(file, next) {
-                    console.log(`Reading: ${file}`);
                     fs.stat(path.join(folderPath, file), (err, stats) => {
                         if(err) {
                             next(err);

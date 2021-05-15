@@ -676,6 +676,74 @@ define({ "api": [
   },
   {
     "type": "get",
+    "url": "/users/me/left-disk-space",
+    "title": "2. Request the authorized user's left disk space",
+    "version": "0.1.0",
+    "header": {
+      "fields": {
+        "Header": [
+          {
+            "group": "Header",
+            "type": "String",
+            "optional": false,
+            "field": "x-auth-token",
+            "description": "<p>JWT authorization token</p>"
+          }
+        ]
+      }
+    },
+    "name": "GetLeftDiskSpace",
+    "group": "Users",
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "String",
+            "optional": false,
+            "field": "round",
+            "description": "<p>Set round query parameter to <code>false</code> if you want <code>leftDiskSpaceInMbs</code> value to not rounded.</p>"
+          }
+        ]
+      }
+    },
+    "success": {
+      "fields": {
+        "Success 200": [
+          {
+            "group": "Success 200",
+            "type": "Number",
+            "optional": false,
+            "field": "leftDiskSpaceInBytes",
+            "description": "<p>Authorized user's left disk space in bytes.</p>"
+          },
+          {
+            "group": "Success 200",
+            "type": "Number",
+            "optional": false,
+            "field": "leftDiskSpaceInMbs",
+            "description": "<p>Authorized user's left disk space in MBs.</p>"
+          }
+        ]
+      },
+      "examples": [
+        {
+          "title": "Success-Response:",
+          "content": "HTTP/1.1 200 OK\n{\n  \"leftDiskSpaceInBytes\": 52428203,\n  \"leftDiskSpaceInMbs\": 50\n}",
+          "type": "json"
+        }
+      ]
+    },
+    "filename": "routes/users.js",
+    "groupTitle": "Users",
+    "sampleRequest": [
+      {
+        "url": "http://localhost:3000/api/users/me/left-disk-space"
+      }
+    ]
+  },
+  {
+    "type": "get",
     "url": "/users/me",
     "title": "1. Request the authorized user",
     "version": "0.1.0",
@@ -753,7 +821,7 @@ define({ "api": [
   {
     "type": "put",
     "url": "/users/me",
-    "title": "2. Update the authorized user",
+    "title": "3. Update the authorized user",
     "version": "0.1.0",
     "header": {
       "fields": {

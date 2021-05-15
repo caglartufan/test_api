@@ -290,7 +290,7 @@ define({ "api": [
   {
     "type": "post",
     "url": "/documents/mine/",
-    "title": "4. Create a new document for authorized user",
+    "title": "3. Create a new document for authorized user",
     "version": "0.1.0",
     "header": {
       "fields": {
@@ -416,7 +416,7 @@ define({ "api": [
   {
     "type": "put",
     "url": "/documents/mine/:documentId",
-    "title": "5. Update an existing document of authorized user",
+    "title": "4. Update an existing document of authorized user",
     "version": "0.1.0",
     "header": {
       "fields": {
@@ -564,7 +564,7 @@ define({ "api": [
   {
     "type": "delete",
     "url": "/documents/mine/:documentId",
-    "title": "6. Remove a document of authorized user",
+    "title": "5. Remove a document of authorized user",
     "version": "0.1.0",
     "header": {
       "fields": {

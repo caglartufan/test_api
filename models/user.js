@@ -1,5 +1,8 @@
 const jwt = require('jsonwebtoken');
 const config = require('config');
+const path = require('path');
+const { bytesToMb, mbToBytes } = require('./../helpers/sizeConverter');
+const readFolderSize = require('./../helpers/readFolderSize');
 const Joi = require('joi');
 const mongoose = require('mongoose');
 
@@ -27,6 +30,11 @@ const userSchema = new mongoose.Schema({
         type: Boolean,
         default: false
     },
+    plan: {
+        type: String,
+        enum: Object.keys(config.get('plans')),
+        default: 'free'
+    },
     documents: [{
         type: mongoose.SchemaTypes.ObjectId,
         ref: 'Document'
@@ -38,9 +46,23 @@ const userSchema = new mongoose.Schema({
 });
 
 userSchema.methods.generateAuthToken = function() {
-    const token = jwt.sign({ _id: this._id, isAdmin: this.isAdmin, username: this.username }, config.get('jwt.privateKey'));
+    const token = jwt.sign({
+        _id: this._id,
+        isAdmin: this.isAdmin,
+        plan: this.plan,
+        username: this.username
+    }, config.get('jwt.privateKey'));
     return token;
 }
+
+userSchema.methods.leftDiskSpace = function(callback) {
+    let userTotalDiskSpaceInBytes = mbToBytes(Number(config.get(`plans.${this.plan}.diskSpace`)));
+    if(!this.documents.length) return callback(null, userTotalDiskSpaceInBytes);
+    let uploadDestination = path.join(process.cwd(), 'uploads', this.username);
+    readFolderSize(uploadDestination)
+        .then((size) => callback(null, userTotalDiskSpaceInBytes - size))
+        .catch((err) => callback(err, null));
+};
 
 const User = mongoose.model('User', userSchema);
 

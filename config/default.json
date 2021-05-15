@@ -4,5 +4,13 @@
     },
     "jwt": {
         "privateKey": ""
+    },
+    "plans": {
+        "free": {
+            "diskSpace": 50
+        },
+        "premium": {
+            "diskSpace": 1024
+        }
     }
 }

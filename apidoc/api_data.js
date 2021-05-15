@@ -290,7 +290,7 @@ define({ "api": [
   {
     "type": "post",
     "url": "/documents/mine/",
-    "title": "3. Create a new document for authorized user",
+    "title": "4. Create a new document for authorized user",
     "version": "0.1.0",
     "header": {
       "fields": {
@@ -383,6 +383,12 @@ define({ "api": [
             "optional": false,
             "field": "fileNotSelected",
             "description": "<p>No file selected in form file input.</p>"
+          },
+          {
+            "group": "Error 4xx",
+            "optional": false,
+            "field": "planLimitExceeded",
+            "description": "<p>User's current plan disk space is exceeded.</p>"
           }
         ]
       },
@@ -390,6 +396,11 @@ define({ "api": [
         {
           "title": "fileNotSelected:",
           "content": "HTTP/1.1 400 fileNotSelected\n{\n  \"error\": {\n    \"message\": \"Herhangi bir doküman seçilmedi.\",\n    \"statusCode\": 400\n  }\n}",
+          "type": "json"
+        },
+        {
+          "title": "planLimitExceeded:",
+          "content": "HTTP/1.1 403 planLimitExceeded\n{\n  \"error\": {\n    \"message\": \"Your plan's disk space is exceeded.\",\n    \"statusCode\": 403\n  }\n}",
           "type": "json"
         }
       ]
@@ -405,7 +416,7 @@ define({ "api": [
   {
     "type": "put",
     "url": "/documents/mine/:documentId",
-    "title": "4. Update an existing document of authorized user",
+    "title": "5. Update an existing document of authorized user",
     "version": "0.1.0",
     "header": {
       "fields": {
@@ -510,6 +521,12 @@ define({ "api": [
             "optional": false,
             "field": "fileNotSelected",
             "description": "<p>No file selected in form file input.</p>"
+          },
+          {
+            "group": "Error 4xx",
+            "optional": false,
+            "field": "planLimitExceeded",
+            "description": "<p>User's current plan disk space is exceeded.</p>"
           }
         ]
       },
@@ -528,6 +545,11 @@ define({ "api": [
           "title": "fileNotSelected:",
           "content": "HTTP/1.1 400 fileNotSelected\n{\n  \"error\": {\n    \"message\": \"Herhangi bir doküman seçilmedi.\",\n    \"statusCode\": 400\n  }\n}",
           "type": "json"
+        },
+        {
+          "title": "planLimitExceeded:",
+          "content": "HTTP/1.1 403 planLimitExceeded\n{\n  \"error\": {\n    \"message\": \"Your plan's disk space is exceeded.\",\n    \"statusCode\": 403\n  }\n}",
+          "type": "json"
         }
       ]
     },
@@ -542,7 +564,7 @@ define({ "api": [
   {
     "type": "delete",
     "url": "/documents/mine/:documentId",
-    "title": "5. Remove a document of authorized user",
+    "title": "6. Remove a document of authorized user",
     "version": "0.1.0",
     "header": {
       "fields": {
@@ -715,7 +737,7 @@ define({ "api": [
       "examples": [
         {
           "title": "Success-Response:",
-          "content": "HTTP/1.1 200 OK\n{\n  \"_id\": \"609c424a2cee6929d4acfdc2\",\n  \"username\": \"johndoe\",\n  \"documents\": [\n    \"609c424a2cee6929d4acfdc3\",\n    \"609c424a2cee6929d4acfdc4\"\n  ],\n  \"joinDate\": \"2021-05-12T21:02:02.126Z\",\n  \"__v\": 0\n}",
+          "content": "HTTP/1.1 200 OK\n{\n  \"_id\": \"609c424a2cee6929d4acfdc2\",\n  \"username\": \"johndoe\",\n  \"plan\": \"free\",\n  \"documents\": [\n    \"609c424a2cee6929d4acfdc3\",\n    \"609c424a2cee6929d4acfdc4\"\n  ],\n  \"joinDate\": \"2021-05-12T21:02:02.126Z\",\n  \"__v\": 0\n}",
           "type": "json"
         }
       ]
@@ -797,7 +819,7 @@ define({ "api": [
       "examples": [
         {
           "title": "Success-Response:",
-          "content": "HTTP/1.1 200 OK\n{\n  \"_id\": \"609c424a2cee6929d4acfdc2\",\n  \"username\": \"johndoe\",\n  \"joinDate\": \"2021-05-12T21:02:02.126Z\"\n}",
+          "content": "HTTP/1.1 200 OK\n{\n  \"_id\": \"609c424a2cee6929d4acfdc2\",\n  \"username\": \"johndoe\",\n  \"plan\": \"free\",\n  \"joinDate\": \"2021-05-12T21:02:02.126Z\"\n}",
           "type": "json"
         }
       ]

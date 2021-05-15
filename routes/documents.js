@@ -3,6 +3,7 @@ const { Document } = require('../models/document');
 const mongoose = require('mongoose');
 const multer = require('multer');
 const jsonFileFilter = require('./../helpers/jsonFileFilter');
+const isValidObjectId = require('./../helpers/isValidObjectId');
 const createError = require('./../helpers/createError');
 const path = require('path');
 const fs = require('fs');
@@ -19,7 +20,7 @@ const storage = multer.diskStorage({
             if(err) {
                 // Directory with username doesn't exist in uploads folder, so create one
                 fs.mkdir(uploadDestination, (err) => {
-                    if(err) throw err;
+                    if(err) cb(err, null);
                     cb(null, uploadDestination);
                 });
             } else {
@@ -123,7 +124,7 @@ router.get('/mine', auth, async (req, res, next) => {
  *     }
  */
 router.get('/mine/:documentId', auth, async (req, res, next) => {
-    if(!mongoose.Types.ObjectId.isValid(req.params.documentId)) return res.status(400).send(createError('Girilen ID değeri uygun değil.', 400));
+    if(!isValidObjectId(req.params.documentId)) return res.status(400).send(createError('Girilen ID değeri uygun değil.', 400));
 
     const document = await Document.findById(req.params.documentId);
     if(!document) return res.status(404).send(createError('Verilen ID değerine sahip doküman bulunamadı.', 404));
@@ -136,7 +137,7 @@ router.get('/mine/:documentId', auth, async (req, res, next) => {
 });
 
 /**
- * @api {post} /documents/mine/ 3. Create a new document for authorized user
+ * @api {post} /documents/mine/ 4. Create a new document for authorized user
  * @apiVersion 0.1.0
  * @apiHeader {String} x-auth-token JWT authorization token
  * @apiName PostMine
@@ -163,6 +164,7 @@ router.get('/mine/:documentId', auth, async (req, res, next) => {
  *     }
  * 
  * @apiError fileNotSelected No file selected in form file input.
+ * @apiError planLimitExceeded User's current plan disk space is exceeded.
  *
  * @apiErrorExample fileNotSelected:
  *     HTTP/1.1 400 fileNotSelected
@@ -172,36 +174,62 @@ router.get('/mine/:documentId', auth, async (req, res, next) => {
  *         "statusCode": 400
  *       }
  *     }
+ * @apiErrorExample planLimitExceeded:
+ *     HTTP/1.1 403 planLimitExceeded
+ *     {
+ *       "error": {
+ *         "message": "Your plan's disk space is exceeded.",
+ *         "statusCode": 403
+ *       }
+ *     }
  */
 router.post('/mine', auth, async (req, res, next) => {
     const user = await User.findById(req.user._id)
-        .select('documents');
+        .select('documents plan');
 
     req.fileUploadFolderName = req.user.username;
 
-    upload(req, res, function(err) {
+    /*upload(req, res, function(err) {
         if(req.fileValidationError) return res.status(400).send(createError(req.fileValidationError.message, 400));
         else if(!req.file) return res.status(400).send(createError('Herhangi bir doküman seçilmedi.', 400));
         else if(err instanceof multer.MulterError) return res.status(500).send(createError(err, 500));
         else if(err) return res.status(500).send(createError(err, 500));
 
-        let document = new Document({
-            filename: req.file.filename,
-            path: `/uploads/${req.fileUploadFolderName}/${req.file.filename}`,
-            size: req.file.size
+        user.leftDiskSpace(function(err, leftSpace) {
+            if(err) {
+                return res.status(400).send(createError(err.message, 400));
+            } else {
+                if(req.file.size > leftSpace) {
+                    fs.access(req.file.path, (err) => {
+                        if(!err) {
+                            fs.unlink(req.file.path, (err) => {
+                                if(err) res.status(500).send('Silinmek istenen doküman diskten silinemedi.');
+                            });
+                        }
+                
+                        return res.status(403).send(createError('Your plan\'s disk space is exceeded.', 403));
+                    });
+                } else {
+                    let document = new Document({
+                        filename: req.file.filename,
+                        path: `/uploads/${req.fileUploadFolderName}/${req.file.filename}`,
+                        size: req.file.size
+                    });
+            
+                    document.save()
+                        .then((savedDocument) => {
+                            user.documents.push(savedDocument._id);
+                            user.save()
+                                .then(() => res.send(savedDocument));
+                        });
+                }
+            }
         });
-
-        document.save()
-            .then((savedDocument) => {
-                user.documents.push(savedDocument._id);
-                user.save()
-                    .then(() => res.send(savedDocument));
-            });
-    });
+    });*/
 });
 
 /**
- * @api {put} /documents/mine/:documentId 4. Update an existing document of authorized user
+ * @api {put} /documents/mine/:documentId 5. Update an existing document of authorized user
  * @apiVersion 0.1.0
  * @apiHeader {String} x-auth-token JWT authorization token.
  * @apiName PutMine
@@ -230,6 +258,7 @@ router.post('/mine', auth, async (req, res, next) => {
  * @apiError documentIdNotValid Given document ObjectId is not a valid ObjectId.
  * @apiError documentNotFound Document with given ObjectId could not found.
  * @apiError fileNotSelected No file selected in form file input.
+ * @apiError planLimitExceeded User's current plan disk space is exceeded.
  *
  * @apiErrorExample documentIdNotValid:
  *     HTTP/1.1 400 documentIdNotValid
@@ -255,15 +284,23 @@ router.post('/mine', auth, async (req, res, next) => {
  *         "statusCode": 400
  *       }
  *     }
+ * @apiErrorExample planLimitExceeded:
+ *     HTTP/1.1 403 planLimitExceeded
+ *     {
+ *       "error": {
+ *         "message": "Your plan's disk space is exceeded.",
+ *         "statusCode": 403
+ *       }
+ *     }
  */
 router.put('/mine/:documentId', auth, async (req, res, next) => {
-    if(!mongoose.Types.ObjectId.isValid(req.params.documentId)) return res.status(400).send(createError('Girilen ID değeri uygun değil.', 400));
+    if(!isValidObjectId(req.params.documentId)) return res.status(400).send(createError('Girilen ID değeri uygun değil.', 400));
     
     const document = await Document.findById(req.params.documentId);
     if(!document) return res.status(404).send(createError('Verilen ID değerine sahip doküman bulunamadı.', 404));
 
     const user = await User.findById(req.user._id)
-        .select('documents');
+        .select('documents plan');
     if(user.documents.indexOf(req.params.documentId) < 0) return res.status(404).send(createError('Verilen ID değerine sahip doküman bulunamadı', 404));
 
     req.fileUploadFolderName = req.user.username;
@@ -274,29 +311,47 @@ router.put('/mine/:documentId', auth, async (req, res, next) => {
         else if(err instanceof multer.MulterError) return res.status(500).send(createError(err, 500));
         else if(err) return res.status(500).send(createError(err, 500));
 
-        let oldFilePathInDiskStorage = path.join(process.cwd(), document.path);
+        user.leftDiskSpace(function(err, leftSpace) {
+            if(err) {
+                return res.status(400).send(createError(err.message, 400));
+            } else {
+                if(req.file.size > leftSpace) {
+                    fs.access(req.file.path, (err) => {
+                        if(!err) {
+                            fs.unlink(req.file.path, (err) => {
+                                if(err) res.status(500).send('Silinmek istenen doküman diskten silinemedi.');
+                            });
+                        }
+                
+                        return res.status(403).send(createError('Your plan\'s disk space is exceeded.', 403));
+                    });
+                } else {
+                    let oldFilePathInDiskStorage = path.join(process.cwd(), document.path);
 
-        // Check if the old file exists or not
-        fs.access(oldFilePathInDiskStorage, (err) => {
-            // If the old file exist remove it
-            if(!err) {
-                fs.unlink(oldFilePathInDiskStorage, (err) => {
-                    if(err) return res.status(500).send(createError('Düzenlenmek istenen dökümanın eski sürümü silinemedi.', 500));
-                });
+                    // Check if the old file exists or not
+                    fs.access(oldFilePathInDiskStorage, (err) => {
+                        // If the old file exist remove it
+                        if(!err) {
+                            fs.unlink(oldFilePathInDiskStorage, (err) => {
+                                if(err) return res.status(500).send(createError('Düzenlenmek istenen dökümanın eski sürümü silinemedi.', 500));
+                            });
+                        }
+
+                        document.filename = req.file.filename;
+                        document.path = `/uploads/${req.fileUploadFolderName}/${req.file.filename}`;
+                        document.size = req.file.size;
+
+                        document.save()
+                            .then((savedDocument) => res.send(savedDocument));
+                    });
+                }
             }
-
-            document.filename = req.file.filename;
-            document.path = `/uploads/${req.fileUploadFolderName}/${req.file.filename}`;
-            document.size = req.file.size;
-
-            document.save()
-                .then((savedDocument) => res.send(savedDocument));
         });
     });
 });
 
 /**
- * @api {delete} /documents/mine/:documentId 5. Remove a document of authorized user
+ * @api {delete} /documents/mine/:documentId 6. Remove a document of authorized user
  * @apiVersion 0.1.0
  * @apiHeader {String} x-auth-token JWT authorization token.
  * @apiName RemoveMine
@@ -341,7 +396,7 @@ router.put('/mine/:documentId', auth, async (req, res, next) => {
  *     }
  */
 router.delete('/mine/:documentId', auth, async (req, res, next) => {
-    if(!mongoose.Types.ObjectId.isValid(req.params.documentId)) return res.status(400).send(createError('Girilen ID değeri uygun değil.', 400));
+    if(!isValidObjectId(req.params.documentId)) return res.status(400).send(createError('Girilen ID değeri uygun değil.', 400));
 
     const user = await User.findById(req.user._id)
         .select('documents');

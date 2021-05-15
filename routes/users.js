@@ -7,6 +7,7 @@ const bcrypt = require('bcrypt');
 const _ = require('lodash');
 const auth = require('./../middlewares/auth');
 const admin = require('./../middlewares/admin');
+const isValidObjectId = require('./../helpers/isValidObjectId');
 const createError = require('./../helpers/createError');
 const express = require('express');
 const router = express.Router();
@@ -29,6 +30,7 @@ const router = express.Router();
  *     {
  *       "_id": "609c424a2cee6929d4acfdc2",
  *       "username": "johndoe",
+ *       "plan": "free",
  *       "documents": [
  *         "609c424a2cee6929d4acfdc3",
  *         "609c424a2cee6929d4acfdc4"
@@ -41,6 +43,14 @@ router.get('/me', auth, async (req, res, next) => {
     const user = await User.findById(req.user._id)
         .select('-password -isAdmin');
     res.send(user);
+});
+
+router.get('/left-disk-space', auth, async (req, res, next) => {
+    const user = await User.findById(req.user._id);
+    user.leftDiskSpace(function(err, leftSpace) {
+        if(err) return res.status(400).send(createError(err.message));
+        res.send({ leftDiskSpace: leftSpace });
+    });
 });
 
 /**
@@ -62,6 +72,7 @@ router.get('/me', auth, async (req, res, next) => {
  *     {
  *       "_id": "609c424a2cee6929d4acfdc2",
  *       "username": "johndoe",
+ *       "plan": "free",
  *       "joinDate": "2021-05-12T21:02:02.126Z"
  *     }
  *
@@ -104,12 +115,16 @@ router.put('/me', auth, async (req, res, next) => {
     user = await User.findById(req.user._id);
     if(!user) return res.status(404).send(createError('Düzenlenmek istenen kullanıcı bulunamadı.', 404));
 
+    let oldUsername = user.username;
+
     user.username = req.body.username;
     const salt = await bcrypt.genSalt(10);
     user.password = await bcrypt.hash(req.body.password, salt);
 
     try {
         user = await user.save();
+        
+        if(user.documents.length) await fs.promises.rename(path.join(process.cwd(), 'uploads', oldUsername), path.join(process.cwd(), 'uploads', user.username));
 
         const token = user.generateAuthToken();
         res.header('x-auth-token', token).send(_.pick(user, ['_id', 'username', 'joinDate']));
@@ -130,7 +145,7 @@ router.get('/', [auth, admin], async (req, res, next) => {
  * ADMINISTRATION ROUTE 2
  */
 router.get('/:id', [auth, admin], async (req, res, next) => {
-    if(!mongoose.Types.ObjectId.isValid(req.params.id)) return res.status(400).send('Girilen ID değeri uygun değil.');
+    if(!isValidObjectId(req.params.id)) return res.status(400).send('Girilen ID değeri uygun değil.');
 
     const user = await User.findById(req.params.id);
     if(!user) return res.status(404).send('Verilen ID değerine sahip kullanıcı bulunamadı.');
@@ -170,7 +185,7 @@ router.post('/', async (req, res, next) => {
  * ADMINISTRATION ROUTE 4
  */
 router.put('/:id', [auth, admin], async (req, res, next) => {
-    if(!mongoose.Types.ObjectId.isValid(req.params.id)) return res.status(400).send('Girilen ID değeri uygun değil.');
+    if(!isValidObjectId(req.params.id)) return res.status(400).send('Girilen ID değeri uygun değil.');
 
     const { error } = validate(req.body);
     if(error) return res.status(400).send(error.details[0].message);
@@ -198,7 +213,7 @@ router.put('/:id', [auth, admin], async (req, res, next) => {
  * ADMINISTRATION ROUTE 5
  */
 router.delete('/:id', [auth, admin], async (req, res, next) => {
-    if(!mongoose.Types.ObjectId.isValid(req.params.id)) return res.status(400).send('Girilen ID değeri uygun değil.');
+    if(!isValidObjectId(req.params.id)) return res.status(400).send('Girilen ID değeri uygun değil.');
 
     const user = await User.findOneAndRemove({ _id: req.params.id });
     if(!user) return res.status(404).send('Verilen ID değerine sahip kullanıcı bulunamadı.');

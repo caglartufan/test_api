@@ -1,6 +1,4 @@
 const { User, validate } = require('../models/user');
-const fs = require('fs');
-const path = require('path');
 const bcrypt = require('bcrypt');
 const _ = require('lodash');
 const auth = require('./../middlewares/auth');
@@ -38,7 +36,7 @@ const router = express.Router();
  */
 router.get('/me', auth, async (req, res) => {
     const user = await User.findById(req.user._id)
-        .select('-password -isAdmin');
+        .select('-password');
     res.send(user);
 });
 
@@ -88,6 +86,7 @@ router.get('/me/left-disk-space', auth, async (req, res) => {
  *
  * @apiSuccess {String} _id ObjectId of the authorized user.
  * @apiSuccess {String} username Username of the authorized user.
+ * @apiSuccess {String} plan Plan of the authorized user.
  * @apiSuccess {String} joinDate Join date of the authorized user.
  *
  * @apiSuccessExample Success-Response:
@@ -151,7 +150,74 @@ router.put('/me', auth, async (req, res) => {
         //if(user.documents.length) await fs.promises.rename(path.join(process.cwd(), 'uploads', oldUsername), path.join(process.cwd(), 'uploads', user.username));
 
         const token = user.generateAuthToken();
-        res.header('x-auth-token', token).send(_.pick(user, ['_id', 'username', 'joinDate']));
+        res.header('x-auth-token', token).send(_.pick(user, ['_id', 'username', 'plan', 'joinDate']));
+    } catch(exception) {
+        res.status(400).send(createError(exception.errors[Object.keys(exception.errors)[0]].properties.message, 400));
+    }
+});
+
+/**
+ * @api {post} /users 4. Register a user
+ * @apiVersion 0.1.0
+ * @apiName PostUser
+ * @apiGroup Users
+ * 
+ * @apiParam {String} username Username of the user.
+ * @apiParam {String} password Password of the user.
+ *
+ * @apiSuccess {String} _id ObjectId of the registered user.
+ * @apiSuccess {String} username Username of the registered user.
+ * @apiSuccess {String} plan Current plan of the registered user.
+ * @apiSuccess {String} joinDate Join date of the registered user.
+ *
+ * @apiSuccessExample Success-Response:
+ *     HTTP/1.1 200 OK
+ *     {
+ *       "_id": "609c424a2cee6929d4acfdc2",
+ *       "username": "johndoe",
+ *       "plan": "free",
+ *       "joinDate": "2021-05-12T21:02:02.126Z"
+ *     }
+ *
+ * @apiError UsernameInUse Username is already in use.
+ * @apiError ValidationError Given request body fields are not valid. (eg <code>username</code>)
+ *
+ * @apiErrorExample UsernameInUse:
+ *     HTTP/1.1 400 UsernameInUse
+ *     {
+ *       "error": {
+ *         "message": "Girmiş olduğunuz kullanıcı adı kullanımda.",
+ *         "statusCode": 400
+ *       }
+ *     }
+ * @apiErrorExample ValidationError:
+ *     HTTP/1.1 400 ValidationError
+ *     {
+ *       "error": {
+ *         "message": "Kullanıcı adınız sadece harf ve rakamlardan oluşmalıdır",
+ *         "statusCode": 400
+ *       }
+ *     }
+ */
+router.post('/', async (req, res) => {
+    let { error } = validate(req.body);
+    if(error) return res.status(400).send(createError(error.details[0].message, 400));
+
+    let user = await User.findOne({ username: req.body.username });
+    if(user) return res.status(400).send(createError('Girmiş olduğunuz kullanıcı adı kullanımda.', 400));
+
+    user = new User({
+        username: req.body.username,
+        password: req.body.password
+    });
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(user.password, salt);
+
+    // Catch validation errors
+    try{
+        user = await user.save();
+        const token = user.generateAuthToken();
+        res.header('x-auth-token', token).send(_.pick(user, ['_id', 'username', 'plan', 'joinDate']));
     } catch(exception) {
         res.status(400).send(createError(exception.errors[Object.keys(exception.errors)[0]].properties.message, 400));
     }

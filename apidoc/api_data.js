@@ -819,6 +819,112 @@ define({ "api": [
     ]
   },
   {
+    "type": "post",
+    "url": "/users",
+    "title": "4. Register a user",
+    "version": "0.1.0",
+    "name": "PostUser",
+    "group": "Users",
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "String",
+            "optional": false,
+            "field": "username",
+            "description": "<p>Username of the user.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "String",
+            "optional": false,
+            "field": "password",
+            "description": "<p>Password of the user.</p>"
+          }
+        ]
+      }
+    },
+    "success": {
+      "fields": {
+        "Success 200": [
+          {
+            "group": "Success 200",
+            "type": "String",
+            "optional": false,
+            "field": "_id",
+            "description": "<p>ObjectId of the registered user.</p>"
+          },
+          {
+            "group": "Success 200",
+            "type": "String",
+            "optional": false,
+            "field": "username",
+            "description": "<p>Username of the registered user.</p>"
+          },
+          {
+            "group": "Success 200",
+            "type": "String",
+            "optional": false,
+            "field": "plan",
+            "description": "<p>Current plan of the registered user.</p>"
+          },
+          {
+            "group": "Success 200",
+            "type": "String",
+            "optional": false,
+            "field": "joinDate",
+            "description": "<p>Join date of the registered user.</p>"
+          }
+        ]
+      },
+      "examples": [
+        {
+          "title": "Success-Response:",
+          "content": "HTTP/1.1 200 OK\n{\n  \"_id\": \"609c424a2cee6929d4acfdc2\",\n  \"username\": \"johndoe\",\n  \"plan\": \"free\",\n  \"joinDate\": \"2021-05-12T21:02:02.126Z\"\n}",
+          "type": "json"
+        }
+      ]
+    },
+    "error": {
+      "fields": {
+        "Error 4xx": [
+          {
+            "group": "Error 4xx",
+            "optional": false,
+            "field": "UsernameInUse",
+            "description": "<p>Username is already in use.</p>"
+          },
+          {
+            "group": "Error 4xx",
+            "optional": false,
+            "field": "ValidationError",
+            "description": "<p>Given request body fields are not valid. (eg <code>username</code>)</p>"
+          }
+        ]
+      },
+      "examples": [
+        {
+          "title": "UsernameInUse:",
+          "content": "HTTP/1.1 400 UsernameInUse\n{\n  \"error\": {\n    \"message\": \"Girmiş olduğunuz kullanıcı adı kullanımda.\",\n    \"statusCode\": 400\n  }\n}",
+          "type": "json"
+        },
+        {
+          "title": "ValidationError:",
+          "content": "HTTP/1.1 400 ValidationError\n{\n  \"error\": {\n    \"message\": \"Kullanıcı adınız sadece harf ve rakamlardan oluşmalıdır\",\n    \"statusCode\": 400\n  }\n}",
+          "type": "json"
+        }
+      ]
+    },
+    "filename": "routes/users.js",
+    "groupTitle": "Users",
+    "sampleRequest": [
+      {
+        "url": "http://localhost:3000/api/users"
+      }
+    ]
+  },
+  {
     "type": "put",
     "url": "/users/me",
     "title": "3. Update the authorized user",
@@ -874,6 +980,13 @@ define({ "api": [
             "optional": false,
             "field": "username",
             "description": "<p>Username of the authorized user.</p>"
+          },
+          {
+            "group": "Success 200",
+            "type": "String",
+            "optional": false,
+            "field": "plan",
+            "description": "<p>Plan of the authorized user.</p>"
           },
           {
             "group": "Success 200",

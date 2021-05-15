@@ -129,25 +129,26 @@ router.get('/me/left-disk-space', auth, async (req, res) => {
  *     }
  */
 router.put('/me', auth, async (req, res) => {
-    const { error } = validate(req.body);
-    if(error) return res.status(400).send(error.details[0].message);
+    //const { error } = validate(req.body);
+    //if(error) return res.status(400).send(error.details[0].message);
+    if(!req.body.password || req.body.password.length < 4 || req.body.password.length > 255 ) return res.status(400).send(createError('Your password is not valid.', 400));
     
-    let user = await User.findOne({ username: req.body.username });
-    if(user && req.user._id != user._id) return res.status(400).send(createError('Girmiş olduğunuz kullanıcı adı kullanımda.', 400));
+    //let user = await User.findOne({ username: req.body.username });
+    //if(user && req.user._id != user._id) return res.status(400).send(createError('Girmiş olduğunuz kullanıcı adı kullanımda.', 400));
 
     user = await User.findById(req.user._id);
     if(!user) return res.status(404).send(createError('Düzenlenmek istenen kullanıcı bulunamadı.', 404));
 
-    let oldUsername = user.username;
+    //let oldUsername = user.username;
 
-    user.username = req.body.username;
+    //user.username = req.body.username;
     const salt = await bcrypt.genSalt(10);
     user.password = await bcrypt.hash(req.body.password, salt);
 
     try {
         user = await user.save();
         
-        if(user.documents.length) await fs.promises.rename(path.join(process.cwd(), 'uploads', oldUsername), path.join(process.cwd(), 'uploads', user.username));
+        //if(user.documents.length) await fs.promises.rename(path.join(process.cwd(), 'uploads', oldUsername), path.join(process.cwd(), 'uploads', user.username));
 
         const token = user.generateAuthToken();
         res.header('x-auth-token', token).send(_.pick(user, ['_id', 'username', 'joinDate']));

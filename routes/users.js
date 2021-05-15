@@ -81,7 +81,6 @@ router.get('/me/left-disk-space', auth, async (req, res) => {
  * @apiName PutMe
  * @apiGroup Users
  * 
- * @apiParam {String} username New username of the user that is authorized.
  * @apiParam {String} password New password of the user that is authorized.
  *
  * @apiSuccess {String} _id ObjectId of the authorized user.
@@ -98,18 +97,9 @@ router.get('/me/left-disk-space', auth, async (req, res) => {
  *       "joinDate": "2021-05-12T21:02:02.126Z"
  *     }
  *
- * @apiError UsernameInUse Username is already in use.
  * @apiError UserNotFound User with ObjectId provided by authorization token could not found.
  * @apiError ValidationError Given request body fields are not valid. (eg <code>username</code>)
  *
- * @apiErrorExample UsernameInUse:
- *     HTTP/1.1 400 UsernameInUse
- *     {
- *       "error": {
- *         "message": "Girmiş olduğunuz kullanıcı adı kullanımda.",
- *         "statusCode": 400
- *       }
- *     }
  * @apiErrorExample UserNotFound:
  *     HTTP/1.1 404 UserNotFound
  *     {

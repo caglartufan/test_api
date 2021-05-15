@@ -951,13 +951,6 @@ define({ "api": [
             "group": "Parameter",
             "type": "String",
             "optional": false,
-            "field": "username",
-            "description": "<p>New username of the user that is authorized.</p>"
-          },
-          {
-            "group": "Parameter",
-            "type": "String",
-            "optional": false,
             "field": "password",
             "description": "<p>New password of the user that is authorized.</p>"
           }
@@ -1011,12 +1004,6 @@ define({ "api": [
           {
             "group": "Error 4xx",
             "optional": false,
-            "field": "UsernameInUse",
-            "description": "<p>Username is already in use.</p>"
-          },
-          {
-            "group": "Error 4xx",
-            "optional": false,
             "field": "UserNotFound",
             "description": "<p>User with ObjectId provided by authorization token could not found.</p>"
           },
@@ -1029,11 +1016,6 @@ define({ "api": [
         ]
       },
       "examples": [
-        {
-          "title": "UsernameInUse:",
-          "content": "HTTP/1.1 400 UsernameInUse\n{\n  \"error\": {\n    \"message\": \"Girmiş olduğunuz kullanıcı adı kullanımda.\",\n    \"statusCode\": 400\n  }\n}",
-          "type": "json"
-        },
         {
           "title": "UserNotFound:",
           "content": "HTTP/1.1 404 UserNotFound\n{\n  \"error\": {\n    \"message\": \"Düzenlenmek istenen kullanıcı bulunamadı.\",\n    \"statusCode\": 404\n  }\n}",

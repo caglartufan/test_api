@@ -111,7 +111,7 @@ router.get('/mine/:documentId', auth, async (req, res) => {
 });
 
 /**
- * @api {post} /documents/mine/ 4. Create a new document for authorized user
+ * @api {post} /documents/mine/ 3. Create a new document for authorized user
  * @apiVersion 0.1.0
  * @apiHeader {String} x-auth-token JWT authorization token
  * @apiName PostMine
@@ -194,7 +194,7 @@ router.post('/mine', [auth, uploadFile], async (req, res) => {
 });
 
 /**
- * @api {put} /documents/mine/:documentId 5. Update an existing document of authorized user
+ * @api {put} /documents/mine/:documentId 4. Update an existing document of authorized user
  * @apiVersion 0.1.0
  * @apiHeader {String} x-auth-token JWT authorization token.
  * @apiName PutMine
@@ -316,7 +316,7 @@ router.put('/mine/:documentId', [auth, uploadFile], async (req, res) => {
 });
 
 /**
- * @api {delete} /documents/mine/:documentId 6. Remove a document of authorized user
+ * @api {delete} /documents/mine/:documentId 5. Remove a document of authorized user
  * @apiVersion 0.1.0
  * @apiHeader {String} x-auth-token JWT authorization token.
  * @apiName RemoveMine

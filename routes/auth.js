@@ -43,7 +43,7 @@ const router = express.Router();
  *       }
  *     }
  */
-router.post('/', async (req, res, next) => {
+router.post('/', async (req, res) => {
     const { error } = validate(req.body);
     if(error) return res.status(400).send(createError(error.details[0].message, 400));
 

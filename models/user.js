@@ -53,7 +53,7 @@ userSchema.methods.generateAuthToken = function() {
 userSchema.methods.leftDiskSpace = function(callback) {
     let userTotalDiskSpaceInBytes = mbToBytes(Number(config.get(`plans.${this.plan}.diskSpace`)));
     if(!this.documents.length) return callback(null, userTotalDiskSpaceInBytes);
-    let uploadDestination = path.join(process.cwd(), 'uploads', this.username);
+    let uploadDestination = path.join(process.cwd(), config.get('diskStorage.destination'), this.username);
     readFolderSize(uploadDestination)
         .then((size) => callback(null, userTotalDiskSpaceInBytes - size))
         .catch((err) => callback(err, null));

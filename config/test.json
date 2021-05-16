@@ -1,0 +1,11 @@
+{
+    "mongoDB": {
+        "connectionString": "mongodb://localhost:27017/api_test"
+    },
+    "diskStorage": {
+        "destination": "\\tests\\integration\\uploads"
+    },
+    "jwt": {
+        "privateKey": "test"
+    }
+}

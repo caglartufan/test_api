@@ -125,8 +125,8 @@ router.put('/me', auth, async (req, res) => {
     //let user = await User.findOne({ username: req.body.username });
     //if(user && req.user._id != user._id) return res.status(400).send(createError('Girmiş olduğunuz kullanıcı adı kullanımda.', 400));
 
-    user = await User.findById(req.user._id);
-    if(!user) return res.status(404).send(createError('Düzenlenmek istenen kullanıcı bulunamadı.', 404));
+    let user = await User.findById(req.user._id);
+    //if(!user) return res.status(404).send(createError('Düzenlenmek istenen kullanıcı bulunamadı.', 404));
 
     //let oldUsername = user.username;
 
@@ -140,9 +140,9 @@ router.put('/me', auth, async (req, res) => {
         //if(user.documents.length) await fs.promises.rename(path.join(process.cwd(), 'uploads', oldUsername), path.join(process.cwd(), 'uploads', user.username));
 
         const token = user.generateAuthToken();
-        res.header('x-auth-token', token).send(_.pick(user, ['_id', 'username', 'plan', 'joinDate']));
+        res.header('x-auth-token', token).send(_.omit(user.toObject(), 'password'));
     } catch(exception) {
-        res.status(400).send(createError(exception.errors[Object.keys(exception.errors)[0]].properties.message, 400));
+        //res.status(400).send(createError(exception.errors[Object.keys(exception.errors)[0]].properties.message, 400));
     }
 });
 
@@ -207,9 +207,9 @@ router.post('/', async (req, res) => {
     try{
         user = await user.save();
         const token = user.generateAuthToken();
-        res.header('x-auth-token', token).send(_.pick(user, ['_id', 'username', 'plan', 'joinDate']));
+        res.header('x-auth-token', token).send(_.omit(user.toObject(), 'password'));
     } catch(exception) {
-        res.status(400).send(createError(exception.errors[Object.keys(exception.errors)[0]].properties.message, 400));
+        //res.status(400).send(createError(exception.errors[Object.keys(exception.errors)[0]].properties.message, 400));
     }
 });
 

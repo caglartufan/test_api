@@ -1,5 +1,6 @@
 const { User } = require('../models/user');
 const { Document } = require('../models/document');
+const accessAndRemoveFile = require('./../helpers/accessAndRemoveFile');
 const isValidObjectId = require('./../helpers/isValidObjectId');
 const createError = require('./../helpers/createError');
 const path = require('path');
@@ -158,39 +159,30 @@ router.get('/mine/:documentId', auth, async (req, res) => {
  *     }
  */
 router.post('/mine', [auth, uploadFile], async (req, res) => {
-    const user = await User.findById(req.user._id);
+    try {
+        let user = await User.findById(req.user._id);
 
-    user.leftDiskSpace(function(err, leftSpace) {
-        if(err) {
-            return res.status(400).send(createError(err.message, 400));
+        let leftDiskSpace = await user.leftDiskSpace();
+
+        if(leftDiskSpace < 0) {
+            await accessAndRemoveFile(req.file.path);
+            res.status(403).send(createError('Your plan\'s disk space is exceeded.', 403));
         } else {
-            if(leftSpace < 0) {
-                fs.access(req.file.path, (err) => {
-                    if(err) {
-                        res.status(403).send(createError('Your plan\'s disk space is exceeded.', 403));
-                    } else {
-                        fs.unlink(req.file.path, (err) => {
-                            if(err) res.status(500).send('Silinmek istenen doküman diskten silinemedi.');
-                            else res.status(403).send(createError('Your plan\'s disk space is exceeded.', 403));
-                        });
-                    }
-                });
-            } else {
-                let document = new Document({
-                    filename: req.file.filename,
-                    path: `/uploads/${req.user.username}/${req.file.filename}`,
-                    size: req.file.size
-                });
-        
-                document.save()
-                    .then((savedDocument) => {
-                        user.documents.push(savedDocument._id);
-                        user.save()
-                            .then(() => res.send(savedDocument));
-                    });
-            }
+            let document = new Document({
+                filename: req.file.filename,
+                path: `/uploads/${req.user.username}/${req.file.filename}`,
+                size: req.file.size
+            });
+            document = await document.save();
+
+            user.documents.push(document._id);
+            user = await user.save();
+
+            res.send(document);
         }
-    });
+    } catch(ex) {
+        res.status(500).send(createError(ex.message, 500));
+    }
 });
 
 /**
@@ -259,60 +251,36 @@ router.post('/mine', [auth, uploadFile], async (req, res) => {
  *     }
  */
 router.put('/mine/:documentId', [auth, uploadFile], async (req, res) => {
-    if(!isValidObjectId(req.params.documentId)) return res.status(400).send(createError('Girilen ID değeri uygun değil.', 400));
+    try {
+        if(!isValidObjectId(req.params.documentId)) return res.status(400).send(createError('Girilen ID değeri uygun değil.', 400));
     
-    const document = await Document.findById(req.params.documentId);
-    if(!document) return res.status(404).send(createError('Verilen ID değerine sahip doküman bulunamadı.', 404));
-
-    const user = await User.findById(req.user._id);
-    if(user.documents.indexOf(req.params.documentId) < 0) return res.status(404).send(createError('Verilen ID değerine sahip doküman bulunamadı', 404));
-
-    user.leftDiskSpace(function(err, leftSpace) {
-        if(err) {
-            return res.status(400).send(createError(err.message, 400));
+        let document = await Document.findById(req.params.documentId);
+        if(!document) return res.status(404).send(createError('Verilen ID değerine sahip doküman bulunamadı.', 404));
+    
+        let user = await User.findById(req.user._id);
+        if(user.documents.indexOf(req.params.documentId) < 0) return res.status(404).send(createError('Verilen ID değerine sahip doküman bulunamadı', 404));
+    
+        let leftDiskSpace = await user.leftDiskSpace();
+    
+        if((leftDiskSpace + document.size) < 0) {
+            await accessAndRemoveFile(req.file.path);
+            res.status(403).send(createError('Your plan\'s disk space is exceeded.', 403));
         } else {
-            // Check if the user's directory size with uploaded file minus old file size
-            // exceeds the limits of user
-            if((leftSpace + document.size) < 0) {
-                fs.access(req.file.path, (err) => {
-                    if(!err) {
-                        fs.unlink(req.file.path, (err) => {
-                            if(err) res.status(500).send('Silinmek istenen doküman diskten silinemedi.');
-                            else res.status(403).send(createError('Your plan\'s disk space is exceeded.', 403));
-                        });
-                    }
-                });
-            } else {
-                let oldFilePathInDiskStorage = path.join(process.cwd(), document.path);
+            let oldFilePathInDiskStorage = path.join(process.cwd(), document.path);
 
-                // Check if the old file exists or not
-                fs.access(oldFilePathInDiskStorage, (err) => {
-                    if(err) {
-                        document.filename = req.file.filename;
-                        document.path = `/uploads/${req.user.username}/${req.file.filename}`;
-                        document.size = req.file.size;
-            
-                        document.save()
-                            .then((savedDocument) => res.send(savedDocument));
-                    } else {
-                        // If the old file exist, remove it
-                        fs.unlink(oldFilePathInDiskStorage, (err) => {
-                            if(err) {
-                                return res.status(500).send(createError('Düzenlenmek istenen dökümanın eski sürümü silinemedi.', 500));
-                            } else {
-                                document.filename = req.file.filename;
-                                document.path = `/uploads/${req.user.username}/${req.file.filename}`;
-                                document.size = req.file.size;
-            
-                                document.save()
-                                    .then((savedDocument) => res.send(savedDocument));
-                            }
-                        });
-                    }
-                });
-            }
+            await fs.promises.unlink(oldFilePathInDiskStorage)
+                .catch((err) => { return; });
+
+            document.filename = req.file.filename;
+            document.path = `/uploads/${req.user.username}/${req.file.filename}`;
+            document.size = req.file.size;
+
+            document = await document.save();
+            res.send(document);
         }
-    });
+    } catch(ex) {
+        res.status(500).send(createError(ex.message, 500));
+    }
 });
 
 /**
@@ -369,7 +337,7 @@ router.delete('/mine/:documentId', auth, async (req, res) => {
 
     const document = await Document.findOneAndRemove({ _id: req.params.documentId });
     if(!document) return res.status(404).send(createError('Verilen ID değerine sahip doküman bulunamadı.', 404));
-    
+
     user.documents.splice(user.documents.indexOf(req.params.documentId), 1);
 
     let deletedFilePathInDiskStorage = path.join(process.cwd(), document.path);

@@ -50,13 +50,15 @@ userSchema.methods.generateAuthToken = function() {
     return token;
 }
 
-userSchema.methods.leftDiskSpace = function(callback) {
-    let userTotalDiskSpaceInBytes = mbToBytes(Number(config.get(`plans.${this.plan}.diskSpace`)));
-    if(!this.documents.length) return callback(null, userTotalDiskSpaceInBytes);
-    let uploadDestination = path.join(process.cwd(), config.get('diskStorage.destination'), this.username);
-    readFolderSize(uploadDestination)
-        .then((size) => callback(null, userTotalDiskSpaceInBytes - size))
-        .catch((err) => callback(err, null));
+userSchema.methods.leftDiskSpace = function() {
+    return new Promise((resolve, reject) => {
+        let userTotalDiskSpaceInBytes = mbToBytes(Number(config.get(`plans.${this.plan}.diskSpace`)));
+        if(!this.documents.length) return resolve(userTotalDiskSpaceInBytes);
+        let uploadDestination = path.join(process.cwd(), config.get('diskStorage.destination'), this.username);
+        readFolderSize(uploadDestination)
+            .then((size) => resolve(userTotalDiskSpaceInBytes - size))
+            .catch((err) => reject(err));
+    });
 };
 
 const User = mongoose.model('User', userSchema);

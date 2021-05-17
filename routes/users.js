@@ -65,13 +65,16 @@ router.get('/me/left-disk-space', auth, async (req, res) => {
 
     let roundFlag = req.query.round && req.query.round.trim().toLowerCase() === 'false' ? false : true;
 
-    user.leftDiskSpace(function(err, leftSpace) {
-        if(err) return res.status(400).send(createError(err.message));
+    try {
+        let leftDiskSpace = await user.leftDiskSpace();
+
         res.send({
-            leftDiskSpaceInBytes: leftSpace,
-            leftDiskSpaceInMbs: bytesToMb(leftSpace, roundFlag)
+            leftDiskSpaceInBytes: leftDiskSpace,
+            leftDiskSpaceInMbs: bytesToMb(leftDiskSpace, roundFlag)
         });
-    });
+    } catch(ex) {
+        res.status(500).send(createError(ex.message, 500));
+    }
 });
 
 /**

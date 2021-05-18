@@ -10,14 +10,38 @@ describe('auth middleware', () => {
             plan: 'free'
         };
         const token = new User(user).generateAuthToken();
-        const req = {
+        const mockReq = {
             header: jest.fn().mockReturnValue(token)
         };
-        const next = jest.fn();
-        const res = {};
+        const mockRes = {};
+        const mockNext = jest.fn();
     
-        auth(req, res, next);
+        auth(mockReq, mockRes, mockNext);
 
-        expect(req.user).toMatchObject(user);
+        expect(mockReq.user).toMatchObject(user);
+        expect(mockReq.header).toBeCalled();
+    });
+
+    it('should call response function with status 400 and return error', () => {
+        const mockReq = {
+            header: jest.fn().mockReturnValue('1')
+        };
+        const mockRes = {
+            statusCode: 200,
+            status: jest.fn().mockImplementation(function(statusCode) {
+                this.statusCode = statusCode;
+                return this;
+            }),
+            send: jest.fn().mockImplementation(function(any) {
+                return;
+            })
+        };
+        const mockNext = jest.fn();
+
+        auth(mockReq, mockRes, mockNext);
+
+        expect(mockRes.statusCode).toBe(400);
+        expect(mockRes.status).toHaveBeenCalledWith(400);
+        expect(mockRes.send).toHaveBeenCalled();
     });
 });

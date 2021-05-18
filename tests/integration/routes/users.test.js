@@ -55,11 +55,12 @@ describe('/api/users', () => {
     describe('GET /me/left-disk-space', () => {
         let user;
         let token;
+        let query;
         const plans = config.get('plans');
 
         const exec = async () => {
             return await request(server)
-                .get('/api/users/me/left-disk-space')
+                .get(`/api/users/me/left-disk-space${query}`)
                 .set('x-auth-token', token);
         };
 
@@ -71,6 +72,7 @@ describe('/api/users', () => {
             await user.save();
 
             token = user.generateAuthToken();
+            query = '';
         });
 
         it('should return 401 if user is not authorized', async () => {
@@ -82,6 +84,16 @@ describe('/api/users', () => {
         });
 
         it('should return authorized user\'s left disk space in bytes and megabytes', async () => {
+            const res = await exec();
+
+            expect(res.status).toBe(200);
+            expect(res.body).toHaveProperty('leftDiskSpaceInBytes');
+            expect(res.body).toHaveProperty('leftDiskSpaceInMbs');
+        });
+
+        it('should return authorized user\'s left disk space in megabytes without rounding if round=false query parameter is set', async () => {
+            query = '?round=false';
+            
             const res = await exec();
 
             expect(res.status).toBe(200);

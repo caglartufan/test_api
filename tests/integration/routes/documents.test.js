@@ -6,15 +6,18 @@ const fs = require('fs');
 const path = require('path');
 const config = require('config');
 
+let testFilesDirectory = path.join(process.cwd(), 'tests', 'integration', 'files');
+let testUploadsDirectory = path.join(process.cwd(), config.get('diskStorage.destination'));
+
 let server;
 
 describe('/api/documents', () => {
     beforeEach(() => { server = require('../../../bin/www'); });
     afterEach(async () => {
-        let pathToTestFolder = path.join(process.cwd(), config.get('diskStorage.destination'), 'user');
+        let pathToTestUserFolder = path.join(testUploadsDirectory, 'user');
 
-        await fs.promises.access(pathToTestFolder)
-            .then(() => fs.promises.rm(pathToTestFolder, { recursive: true }))
+        await fs.promises.access(pathToTestUserFolder)
+            .then(() => fs.promises.rm(pathToTestUserFolder, { recursive: true }))
             .catch((err) => { return; });
 
         await User.deleteMany({});
@@ -246,8 +249,6 @@ describe('/api/documents', () => {
         let documentId;
         let file;
 
-        let testFilesDirectory = path.join(process.cwd(), 'tests', 'integration', 'files');
-
         const exec = async () => {
             return await request(server)
                 .put(`/api/documents/mine/${documentId}`)
@@ -316,7 +317,7 @@ describe('/api/documents', () => {
         });
 
         it('should return 400 if a non-JSON document attached', async () => {
-            file = path.join(process.cwd(), 'tests', 'integration', 'files', 'test.png');
+            file = path.join(testFilesDirectory, 'test.png');
 
             const res = await exec();
 
@@ -324,19 +325,18 @@ describe('/api/documents', () => {
         });
 
         it('should return the updated document if user is authorized, has disk space and file is valid', async () => {
-            let testUploadsDirectory = path.join(process.cwd(), 'tests', 'integration', 'uploads');
             file = path.join(testFilesDirectory, 'update.json');
 
             let uploadDate = Date.now();
             let document = new Document({
                 filename: `test--${uploadDate}.json`,
-                path: `/uploads/user/test--${uploadDate}.json`,
+                path: `/tests/integration/uploads/user/test--${uploadDate}.json`,
                 size: 26,
                 uploadDate: uploadDate
             });
             document = await document.save();
 
-            let fileContent = await fs.promises.readFile(path.join(testFilesDirectory, 'test.json'), { encoding: 'utf8' })
+            let fileContent = await fs.promises.readFile(path.join(testFilesDirectory, 'test.json'), { encoding: 'utf8' });
             await fs.promises.mkdir(path.join(testUploadsDirectory, 'user'));
             await fs.promises.writeFile(path.join(testUploadsDirectory, 'user', `test--${uploadDate}.json`), fileContent, { encoding: 'utf8' });
 
@@ -421,10 +421,14 @@ describe('/api/documents', () => {
         it('should return the removed document if the document exists and is user\'s', async () => {
             let document = new Document({
                 filename: 'test.json',
-                path: '/uploads/user/test.json',
-                size: 500
+                path: '/tests/integration/uploads/user/test.json',
+                size: 26
             });
             document = await document.save();
+
+            let fileContent = await fs.promises.readFile(path.join(testFilesDirectory, 'test.json'), { encoding: 'utf8' })
+            await fs.promises.mkdir(path.join(testUploadsDirectory, 'user'));
+            await fs.promises.writeFile(path.join(testUploadsDirectory, 'user', `test.json`), fileContent, { encoding: 'utf8' });
 
             documentId = document._id;
 
@@ -436,8 +440,8 @@ describe('/api/documents', () => {
             expect(res.status).toBe(200);
             expect(res.body).toHaveProperty('_id');
             expect(res.body).toHaveProperty('filename', 'test.json');
-            expect(res.body).toHaveProperty('path', '/uploads/user/test.json');
-            expect(res.body).toHaveProperty('size', 500);
+            expect(res.body).toHaveProperty('path', '/tests/integration/uploads/user/test.json');
+            expect(res.body).toHaveProperty('size', 26);
         });
     });
 });

@@ -61,11 +61,11 @@ router.get('/me', auth, async (req, res) => {
  *     }
  */
 router.get('/me/left-disk-space', auth, async (req, res) => {
-    const user = await User.findById(req.user._id);
-
-    let roundFlag = req.query.round && req.query.round.trim().toLowerCase() === 'false' ? false : true;
-
     try {
+        const user = await User.findById(req.user._id);
+
+        let roundFlag = req.query.round && req.query.round.trim().toLowerCase() === 'false' ? false : true;
+
         let leftDiskSpace = await user.leftDiskSpace();
 
         res.send({

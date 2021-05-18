@@ -165,8 +165,9 @@ router.post('/mine', [auth, uploadFile], async (req, res) => {
         let leftDiskSpace = await user.leftDiskSpace();
 
         if(leftDiskSpace < 0) {
-            await accessAndRemoveFile(req.file.path);
-            res.status(403).send(createError('Your plan\'s disk space is exceeded.', 403));
+            accessAndRemoveFile(req.file.path)
+                .then(() => res.status(403).send(createError('Your plan\'s disk space is exceeded.', 403)));
+            
         } else {
             let document = new Document({
                 filename: req.file.filename,
@@ -329,30 +330,28 @@ router.put('/mine/:documentId', [auth, uploadFile], async (req, res) => {
  *     }
  */
 router.delete('/mine/:documentId', auth, async (req, res) => {
-    if(!isValidObjectId(req.params.documentId)) return res.status(400).send(createError('Girilen ID değeri uygun değil.', 400));
+    try {
+        if(!isValidObjectId(req.params.documentId)) return res.status(400).send(createError('Girilen ID değeri uygun değil.', 400));
 
-    const user = await User.findById(req.user._id)
-        .select('documents');
-    if(user.documents.indexOf(req.params.documentId) < 0) return res.status(404).send(createError('Verilen ID değerine sahip doküman bulunamadı', 404));
+        let document = await Document.findOneAndRemove({ _id: req.params.documentId });
+        if(!document) return res.status(404).send(createError('Verilen ID değerine sahip doküman bulunamadı.', 404));
 
-    const document = await Document.findOneAndRemove({ _id: req.params.documentId });
-    if(!document) return res.status(404).send(createError('Verilen ID değerine sahip doküman bulunamadı.', 404));
+        let user = await User.findById(req.user._id)
+            .select('documents');
+        if(user.documents.indexOf(req.params.documentId) < 0) return res.status(404).send(createError('Verilen ID değerine sahip doküman bulunamadı', 404));
 
-    user.documents.splice(user.documents.indexOf(req.params.documentId), 1);
+        user.documents.splice(user.documents.indexOf(req.params.documentId), 1);
+        user = await user.save();
 
-    let deletedFilePathInDiskStorage = path.join(process.cwd(), document.path);
+        let deletedFilePathInDiskStorage = path.join(process.cwd(), document.path);
 
-    // Remove the deleted document in disk
-    fs.access(deletedFilePathInDiskStorage, (err) => {
-        if(err) {
-            user.save().then(() => res.send(document));
-        } else {
-            fs.unlink(deletedFilePathInDiskStorage, (err) => {
-                if(err) res.status(500).send('Silinmek istenen doküman diskten silinemedi.');
-                else user.save().then(() => res.send(document));
-            });
-        }
-    });
+        await fs.promises.unlink(deletedFilePathInDiskStorage)
+            .catch((err) => { return; });
+
+        res.send(document);
+    } catch(ex) {
+        res.status(500).send(createError(ex.message, 500));
+    }
 });
 
 module.exports = router;

@@ -14,7 +14,25 @@ const usersRouter = require('./routes/users');
 
 const app = express();
 
-app.use(helmet());
+app.use(helmet({
+    contentSecurityPolicy: {
+        directives: {
+            defaultSrc: ["'self'"],
+            blockAllMixedContent: [],
+            fontSrc: ["'self'", 'https:', 'data:'],
+            frameAncestors: ["'self'", 'https://accounts.google.com/'],
+            frameSrc: ["'self'", 'https://accounts.google.com/'],
+            imgSrc: ["'self'", 'data:'],
+            objectSrc: ["'self'", 'blob:'],
+            mediaSrc: ["'self'", 'blob:', 'data:'],
+            scriptSrc: ["'self'", 'https://apis.google.com'],
+            scriptSrcAttr: ["'none'"],
+            styleSrc: ["'self'", 'https:', "'unsafe-inline'"],
+            upgradeInsecureRequests: [],
+            connectSrc: ["'self'", 'https://test-api9.herokuapp.com'],
+        },
+    },
+}));
 app.use(compression());
 
 app.use('/uploads/', express.static(path.join(__dirname, 'uploads')));

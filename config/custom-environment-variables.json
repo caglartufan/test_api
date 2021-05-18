@@ -1,4 +1,7 @@
 {
+    "mongoDB": {
+        "password": "api_mongoDbPassword"
+    },
     "jwt": {
         "privateKey": "api_jwtPrivateKey"
     }

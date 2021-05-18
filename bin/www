@@ -22,15 +22,22 @@ if(!config.get('mongoDB.connectionString')) {
 }
 
 if(!config.get('jwt.privateKey')) {
-    debug('FATAL ERROR: JSON Web Token private key is not defined. Terminating process...');
+    debug('FATAL ERROR: JSON Web Token private key (api_jwtPrivateKey) is not defined. Terminating process...');
+    process.exit(1);
+}
+
+if(process.NODE_ENV === 'production' && !config.get('mongoDB.password')) {
+    debug('FATAL ERROR: MongoDB password (api_mongoDbPassword) is not defined. Terminating process...');
     process.exit(1);
 }
 
 /**
  * Connect to MongoDB
  */
+let connectionString = config.get('mongoDB.connectionString');
+if(process.env.NODE_ENV === 'production') connectionString = connectionString.replace('<password>', config.get('mongoDB.password'));
 
-mongoose.connect(config.get('mongoDB.connectionString'), { useNewUrlParser: true, useUnifiedTopology: true, useCreateIndex: true, useFindAndModify: false })
+mongoose.connect(connectionString, { useNewUrlParser: true, useUnifiedTopology: true, useCreateIndex: true, useFindAndModify: false })
     .then(() => debug('Connected to MongoDB...'))
     .catch(err => debug('Could not connect to MongoDB...', err));
 

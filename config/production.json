@@ -1,6 +1,6 @@
 {
     "mongoDB": {
-        "connectionString": "mongodb://localhost:27017/api",
+        "connectionString": "mongodb+srv://Muhammed_Caglar_TUFAN:<password>@api-cluster.iwseg.mongodb.net/api?retryWrites=true&w=majority",
         "password": ""
     },
     "diskStorage": {

@@ -25,8 +25,6 @@ app.use(helmet({
             imgSrc: ["'self'", 'data:'],
             objectSrc: ["'self'", 'blob:'],
             mediaSrc: ["'self'", 'blob:', 'data:'],
-            scriptSrc: ["'self'", 'https://apis.google.com'],
-            scriptSrcAttr: ["'none'"],
             styleSrc: ["'self'", 'https:', "'unsafe-inline'"],
             upgradeInsecureRequests: [],
             connectSrc: ["'self'", 'https://test-api9.herokuapp.com'],
